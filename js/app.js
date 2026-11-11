@@ -1,30 +1,25 @@
 /**
  * app.js - CoolNavi アプリケーション全体制御
  * 
- * 仕様書の要件:
- * - 画面遷移管理 (ホーム / 検索一覧 / 地図 / AR案内 / モーダル)
- * - 気象情報と現在地の取得・バインド
- * - 涼み場所の検索・ソート・詳細表示
- * - 地図とAR画面の連携
- * - ユーザー利用状況報告機能
+ * オープンデータ・道路沿いARナビゲーション統合版
  */
 
 window.CoolNaviApp = {
-  currentTab: 'home', // 'home' | 'list' | 'map' | 'ar'
+  currentTab: 'home',
   currentLocation: null,
   selectedPlace: null,
+  currentRoute: null,
   placesList: [],
   weatherData: null,
-  activeFilter: 'recommend', // 'recommend' | 'distance'
-  seatOnlyFilter: false,
+  activeFilter: 'recommend',
 
   /**
-   * アプリの初期化
+   * アプリ初期化
    */
   async init() {
     this.bindEvents();
 
-    // 1. 気象データと涼み場所データのロード
+    // 1. 初期データロード
     await this.loadInitialData();
 
     // 2. 地図の初期化
@@ -38,66 +33,70 @@ window.CoolNaviApp = {
       this.renderAROverlay(state);
     });
 
-    // 4. 初回位置情報の取得 (非同期)
-    this.refreshLocation(false);
+    // 4. 初回位置情報取得
+    await this.refreshLocation(false);
   },
 
   /**
-   * イベントリスナーの登録
+   * イベントバインド
    */
   bindEvents() {
-    // ボトムナビゲーションの切り替え
+    // ボトムナビ
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
         const tab = e.currentTarget.dataset.tab;
-        if (tab) {
-          this.switchTab(tab);
-        }
+        if (tab) this.switchTab(tab);
       });
     });
 
-    // ホーム画面の主要ボタン
+    // ホーム主要ボタン
     const btnFindPlaces = document.getElementById('btn-find-places');
     if (btnFindPlaces) {
-      btnFindPlaces.addEventListener('click', () => {
-        this.switchTab('list');
-      });
+      btnFindPlaces.addEventListener('click', () => this.switchTab('list'));
     }
 
     const btnQuickMap = document.getElementById('btn-quick-map');
     if (btnQuickMap) {
-      btnQuickMap.addEventListener('click', () => {
-        this.switchTab('map');
-      });
+      btnQuickMap.addEventListener('click', () => this.switchTab('map'));
     }
 
     const btnQuickAR = document.getElementById('btn-quick-ar');
     if (btnQuickAR) {
-      btnQuickAR.addEventListener('click', () => {
+      btnQuickAR.addEventListener('click', async () => {
         const topPlace = PlacesManager.getTopRecommendedPlace(this.currentLocation);
         if (topPlace) {
-          this.startARForPlace(topPlace.id);
+          await this.startARForPlace(topPlace.id);
         } else {
           this.switchTab('list');
         }
       });
     }
 
-    // 現在地更新ボタン
+    // 現在地再取得ボタン
     const btnRefreshLocation = document.getElementById('btn-refresh-location');
     if (btnRefreshLocation) {
-      btnRefreshLocation.addEventListener('click', () => {
-        this.refreshLocation(true);
+      btnRefreshLocation.addEventListener('click', () => this.refreshLocation(true));
+    }
+
+    // デモ位置モード切り替え
+    const demoToggle = document.getElementById('demo-location-toggle');
+    if (demoToggle) {
+      demoToggle.addEventListener('change', async (e) => {
+        LocationManager.setMockMode(e.target.checked);
+        await this.refreshLocation(false);
+        this.showToast(e.target.checked ? '東京駅周辺のデモ位置に設定しました' : '実際のGPS位置情報に切り替えました');
       });
     }
 
-    // デモ位置モード切り替えスイッチ
-    const demoToggle = document.getElementById('demo-location-toggle');
-    if (demoToggle) {
-      demoToggle.addEventListener('change', (e) => {
-        LocationManager.setMockMode(e.target.checked);
-        this.refreshLocation(false);
-        this.showToast(e.target.checked ? '東京駅周辺のデモ位置に設定しました' : '実際のGPS位置情報に切り替えました');
+    // オープンデータ再検索ボタン
+    const btnFetchOpenData = document.getElementById('btn-fetch-opendata');
+    if (btnFetchOpenData) {
+      btnFetchOpenData.addEventListener('click', async () => {
+        if (!this.currentLocation) return;
+        this.showToast('周辺のオープンデータスポットを検索中...');
+        await PlacesManager.fetchLiveOpenDataPlaces(this.currentLocation.latitude, this.currentLocation.longitude);
+        this.renderAllViews();
+        this.showToast('オープンデータスポットを更新しました！');
       });
     }
 
@@ -119,7 +118,7 @@ window.CoolNaviApp = {
       });
     }
 
-    // 地図の現在地センタリングボタン
+    // 地図現在地センタリング
     const btnMapCenter = document.getElementById('btn-map-center');
     if (btnMapCenter) {
       btnMapCenter.addEventListener('click', () => {
@@ -131,7 +130,7 @@ window.CoolNaviApp = {
       });
     }
 
-    // AR終了ボタン
+    // AR終了
     const btnCloseAR = document.getElementById('btn-close-ar');
     if (btnCloseAR) {
       btnCloseAR.addEventListener('click', () => {
@@ -140,7 +139,7 @@ window.CoolNaviApp = {
       });
     }
 
-    // ARカメラ/コンパス手動切替ボタン
+    // ARカメラ/レーダー切替
     const btnToggleARCamera = document.getElementById('btn-toggle-ar-camera');
     if (btnToggleARCamera) {
       btnToggleARCamera.addEventListener('click', async () => {
@@ -160,23 +159,27 @@ window.CoolNaviApp = {
       });
     }
 
-    // モーダルの閉じるボタン
-    document.querySelectorAll('.modal-close').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.closeAllModals();
+    // AR道路ナビ / 直線ナビ切替
+    const btnToggleARMode = document.getElementById('btn-toggle-ar-mode');
+    if (btnToggleARMode) {
+      btnToggleARMode.addEventListener('click', () => {
+        const newMode = ARManager.toggleNavMode();
+        btnToggleARMode.textContent = newMode === 'road' ? '🛣️ 道路ナビ中' : '📍 直線ナビ中';
+        this.showToast(newMode === 'road' ? '道路沿いターンバイターン案内に切り替えました' : '直線案内に切り替えました');
       });
-    });
+    }
 
-    // モーダル背景クリックで閉じる
+    // モーダル閉じる
+    document.querySelectorAll('.modal-close').forEach(btn => {
+      btn.addEventListener('click', () => this.closeAllModals());
+    });
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
       overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-          this.closeAllModals();
-        }
+        if (e.target === overlay) this.closeAllModals();
       });
     });
 
-    // 状況報告送信ボタン
+    // 状況報告
     document.querySelectorAll('.report-choice-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const reportType = e.currentTarget.dataset.type;
@@ -191,7 +194,7 @@ window.CoolNaviApp = {
   },
 
   /**
-   * 初期データの読み込み
+   * 初期データ読み込み
    */
   async loadInitialData() {
     try {
@@ -204,19 +207,16 @@ window.CoolNaviApp = {
       this.renderWeather(weather);
       this.renderPlacesList();
     } catch (err) {
-      console.error('初期データの読み込みエラー:', err);
+      console.error('初期データロードエラー:', err);
     }
   },
 
   /**
-   * 位置情報の更新
-   * @param {boolean} showFeedback ユーザー向け通知を出すか
+   * 位置情報更新 & オープンデータ連動
    */
   async refreshLocation(showFeedback = false) {
     const locStatusText = document.getElementById('current-location-status');
-    if (locStatusText) {
-      locStatusText.textContent = '現在地を取得中...';
-    }
+    if (locStatusText) locStatusText.textContent = '現在地を取得中...';
 
     try {
       const position = await LocationManager.getCurrentPosition();
@@ -230,20 +230,15 @@ window.CoolNaviApp = {
         }
       }
 
-      // 地図と施設リストを更新
       MapManager.updateCurrentLocation(this.currentLocation, false);
-      this.renderAllViews();
 
-      if (showFeedback) {
-        this.showToast('現在地を更新しました');
-      }
+      // リアルタイム気象オープンデータと施設オープンデータの非同期取得
+      this.fetchOpenDataAsync(position.latitude, position.longitude);
+
+      this.renderAllViews();
+      if (showFeedback) this.showToast('現在地を更新しました');
     } catch (error) {
       console.warn('位置情報取得失敗:', error.message);
-      if (locStatusText) {
-        locStatusText.innerHTML = '⚠️ 位置情報を取得できませんでした。<br><small>デモ位置モードでお試しいただけます</small>';
-      }
-
-      // 取得失敗時は安全のため自動的にデモモードを提案または適用
       if (!this.currentLocation) {
         LocationManager.setMockMode(true);
         const demoToggle = document.getElementById('demo-location-toggle');
@@ -252,61 +247,81 @@ window.CoolNaviApp = {
         MapManager.updateCurrentLocation(this.currentLocation, false);
         this.renderAllViews();
       }
-
-      if (showFeedback) {
-        alert(error.message);
-      }
+      if (showFeedback) alert(error.message);
     }
   },
 
   /**
-   * 気象情報の表示
+   * バックグラウンドで実際のオープンデータを取得
+   */
+  async fetchOpenDataAsync(lat, lon) {
+    try {
+      // 1. リアルタイム気象
+      const liveWeather = await PlacesManager.fetchLiveWeather(lat, lon);
+      this.weatherData = liveWeather;
+      this.renderWeather(liveWeather);
+
+      // 2. 周辺オープンデータスポット
+      const updatedPlaces = await PlacesManager.fetchLiveOpenDataPlaces(lat, lon);
+      this.placesList = updatedPlaces;
+      this.renderAllViews();
+
+      // オープンデータバッジ表示
+      const badge = document.getElementById('opendata-live-badge');
+      if (badge && PlacesManager.isLiveOpenDataActive) {
+        badge.classList.add('active');
+        badge.textContent = '🌐 オープンデータ連動中';
+      }
+    } catch (e) {
+      console.warn('オープンデータ連携エラー:', e);
+    }
+  },
+
+  /**
+   * 気象情報の描画
    */
   renderWeather(weather) {
     if (!weather) return;
-
     const tempEl = document.getElementById('weather-temp');
     const maxTempEl = document.getElementById('weather-max-temp');
     const alertEl = document.getElementById('weather-alert-badge');
     const msgEl = document.getElementById('weather-message');
+    const sourceEl = document.getElementById('weather-source-badge');
 
     if (tempEl) tempEl.textContent = `${weather.currentTemp}℃`;
-    if (maxTempEl) maxTempEl.textContent = `最高 ${weather.maxTemp}℃`;
+    if (maxTempEl) maxTempEl.textContent = `最高 ${weather.maxTemp}℃ (湿度 ${weather.humidity || 65}%)`;
     if (alertEl) {
       alertEl.textContent = `⚠️ 熱中症: ${weather.heatStrokeAlert}`;
-      if (weather.heatStrokeAlert.includes('厳重') || weather.heatStrokeAlert.includes('危険')) {
-        alertEl.className = 'weather-alert danger';
-      }
+      alertEl.className = weather.heatStrokeAlert.includes('危険') ? 'weather-alert danger-high' :
+                          weather.heatStrokeAlert.includes('厳重') ? 'weather-alert danger' : 'weather-alert';
     }
     if (msgEl) msgEl.textContent = weather.message;
+    if (sourceEl && weather.isLive) {
+      sourceEl.textContent = '気象オープンデータ (Live)';
+      sourceEl.style.display = 'inline-block';
+    }
   },
 
-  /**
-   * 全画面のデータ描画を更新
-   */
   renderAllViews() {
     this.renderHomeTopPlace();
     this.renderPlacesList();
     this.renderMapPlaces();
   },
 
-  /**
-   * ホーム画面のおすすめカードを描画
-   */
   renderHomeTopPlace() {
     const topPlace = PlacesManager.getTopRecommendedPlace(this.currentLocation);
     const cardEl = document.getElementById('home-top-place-card');
     if (!cardEl) return;
 
     if (!topPlace) {
-      cardEl.innerHTML = '<p class="empty-text">涼み場所を検索中...</p>';
+      cardEl.innerHTML = '<p class="empty-text">涼み場所を計算中...</p>';
       return;
     }
 
     const evalData = topPlace.evaluation;
     cardEl.innerHTML = `
       <div class="top-place-header">
-        <span class="recommend-badge-ribbon">🥇 今一番おすすめ</span>
+        <span class="recommend-badge-ribbon">🥇 今一番休みやすい</span>
         <span class="badge ${evalData.badgeClass}">${evalData.rank}</span>
       </div>
       <h3 class="top-place-name">${topPlace.name}</h3>
@@ -316,6 +331,7 @@ window.CoolNaviApp = {
       </div>
       <div class="feature-tags-row">
         ${evalData.tags.map(tag => `<span class="tag-pill">${tag}</span>`).join('')}
+        ${topPlace.isOpenDataLive ? '<span class="tag-pill opendata">🌐 オープンデータ</span>' : ''}
       </div>
       <p class="top-place-desc">${topPlace.description}</p>
       ${topPlace.recentReport ? `
@@ -324,19 +340,16 @@ window.CoolNaviApp = {
         </div>
       ` : ''}
       <div class="top-place-actions">
-        <button class="btn-primary" onclick="window.CoolNaviApp.startARForPlace(${topPlace.id})">
-          🧭 ARで案内
+        <button class="btn-primary" onclick="window.CoolNaviApp.startARForPlace('${topPlace.id}')">
+          🧭 道路沿いARで案内
         </button>
-        <button class="btn-secondary" onclick="window.CoolNaviApp.showPlaceDetail(${topPlace.id})">
-          詳細を見る
+        <button class="btn-secondary" onclick="window.CoolNaviApp.showPlaceDetail('${topPlace.id}')">
+          詳細・評価内訳
         </button>
       </div>
     `;
   },
 
-  /**
-   * 涼み場所一覧の描画
-   */
   renderPlacesList() {
     const listEl = document.getElementById('places-list-container');
     if (!listEl) return;
@@ -354,12 +367,15 @@ window.CoolNaviApp = {
       const rankIcon = rankNumber === 1 ? '🥇' : rankNumber === 2 ? '🥈' : rankNumber === 3 ? '🥉' : `${rankNumber}.`;
 
       return `
-        <div class="place-card" data-id="${place.id}">
+        <div class="place-card ${place.isOpenDataLive ? 'card-opendata' : ''}" data-id="${place.id}">
           <div class="place-card-top">
             <span class="place-rank-number">${rankIcon}</span>
             <div class="place-title-wrap">
               <h4 class="place-name">${place.name}</h4>
-              <span class="place-badge ${evalData.badgeClass}">${evalData.rank}</span>
+              <div class="place-sub-badges">
+                <span class="place-badge ${evalData.badgeClass}">${evalData.rank}</span>
+                ${place.isOpenDataLive ? '<span class="opendata-mini-badge">OSM</span>' : ''}
+              </div>
             </div>
           </div>
           <div class="place-distance-bar">
@@ -381,13 +397,13 @@ window.CoolNaviApp = {
             </div>
           ` : ''}
           <div class="place-card-actions">
-            <button class="card-btn secondary" onclick="window.CoolNaviApp.showPlaceDetail(${place.id})">
+            <button class="card-btn secondary" onclick="window.CoolNaviApp.showPlaceDetail('${place.id}')">
               詳細
             </button>
-            <button class="card-btn outline" onclick="window.CoolNaviApp.showOnMap(${place.id})">
-              🗺️ 地図
+            <button class="card-btn outline" onclick="window.CoolNaviApp.showOnMap('${place.id}')">
+              🗺️ 経路地図
             </button>
-            <button class="card-btn primary" onclick="window.CoolNaviApp.startARForPlace(${place.id})">
+            <button class="card-btn primary" onclick="window.CoolNaviApp.startARForPlace('${place.id}')">
               🧭 AR案内
             </button>
           </div>
@@ -396,18 +412,11 @@ window.CoolNaviApp = {
     }).join('');
   },
 
-  /**
-   * 地図上のピン描画
-   */
   renderMapPlaces() {
     const list = PlacesManager.getEvaluatedPlaces(this.currentLocation, 'recommend');
     MapManager.renderPlaceMarkers(list);
   },
 
-  /**
-   * タブ画面切り替え
-   * @param {string} tabName 'home' | 'list' | 'map' | 'ar'
-   */
   switchTab(tabName) {
     if (this.currentTab === 'ar' && tabName !== 'ar') {
       ARManager.stopAR();
@@ -415,44 +424,48 @@ window.CoolNaviApp = {
 
     this.currentTab = tabName;
 
-    // タブコンテンツの表示切り替え
-    document.querySelectorAll('.tab-view').forEach(view => {
-      view.classList.remove('active');
-    });
+    document.querySelectorAll('.tab-view').forEach(view => view.classList.remove('active'));
     const targetView = document.getElementById(`tab-view-${tabName}`);
-    if (targetView) {
-      targetView.classList.add('active');
-    }
+    if (targetView) targetView.classList.add('active');
 
-    // ナビゲーションバーのアクティブ表示
     document.querySelectorAll('.nav-item').forEach(item => {
-      if (item.dataset.tab === tabName) {
-        item.classList.add('active');
-      } else {
-        item.classList.remove('active');
-      }
+      if (item.dataset.tab === tabName) item.classList.add('active');
+      else item.classList.remove('active');
     });
 
-    // 地図画面に切り替わった場合は表示崩れを防ぐためにリサイズを発火
     if (tabName === 'map') {
       MapManager.invalidateSize();
       if (this.selectedPlace) {
-        MapManager.selectDestination(this.selectedPlace, this.currentLocation);
+        this.loadAndDrawRoute(this.selectedPlace);
       }
     }
   },
 
-  /**
-   * 地図ピンがタップされた時の処理
-   */
-  onPlaceMarkerClicked(place) {
+  async onPlaceMarkerClicked(place) {
     this.selectedPlace = place;
     this.showMapPlaceBanner(place);
+    await this.loadAndDrawRoute(place);
   },
 
   /**
-   * 地図下部に選択中施設バナーを表示
+   * 道路沿いルートを取得して地図に描画
    */
+  async loadAndDrawRoute(place) {
+    if (!this.currentLocation || !place) return;
+    try {
+      const route = await RoutingManager.getWalkingRoute(
+        this.currentLocation.latitude,
+        this.currentLocation.longitude,
+        place.latitude,
+        place.longitude
+      );
+      this.currentRoute = route;
+      MapManager.drawRoadRoute(route, true);
+    } catch (e) {
+      console.warn('道路ルート取得エラー:', e);
+    }
+  },
+
   showMapPlaceBanner(place) {
     const banner = document.getElementById('map-bottom-banner');
     if (!banner) return;
@@ -463,15 +476,15 @@ window.CoolNaviApp = {
       <div class="map-banner-header">
         <div>
           <h4>${place.name}</h4>
-          <span class="meta">徒歩 約${evalData.walkingMinutes}分 (${evalData.formattedDistance})</span>
+          <span class="meta">🚶 道路沿い歩行 約${evalData.walkingMinutes}分 (${evalData.formattedDistance})</span>
         </div>
         <button class="banner-close-btn" onclick="document.getElementById('map-bottom-banner').classList.remove('active')">✕</button>
       </div>
       <div class="map-banner-actions">
-        <button class="btn-primary" onclick="window.CoolNaviApp.startARForPlace(${place.id})">
-          🧭 ARで案内
+        <button class="btn-primary" onclick="window.CoolNaviApp.startARForPlace('${place.id}')">
+          🧭 道路沿いAR案内
         </button>
-        <button class="btn-secondary" onclick="window.CoolNaviApp.showPlaceDetail(${place.id})">
+        <button class="btn-secondary" onclick="window.CoolNaviApp.showPlaceDetail('${place.id}')">
           詳細
         </button>
       </div>
@@ -479,21 +492,26 @@ window.CoolNaviApp = {
     banner.classList.add('active');
   },
 
-  /**
-   * 施設を地図上でフォーカス
-   */
-  showOnMap(placeId) {
+  async selectPlaceFromMap(placeId) {
     const place = PlacesManager.getPlaceById(placeId);
     if (!place) return;
+    this.selectedPlace = place;
+    this.showMapPlaceBanner(place);
+    await this.loadAndDrawRoute(place);
+  },
 
+  async showOnMap(placeId) {
+    const place = PlacesManager.getPlaceById(placeId);
+    if (!place) return;
     this.selectedPlace = place;
     this.switchTab('map');
-    MapManager.selectDestination(place, this.currentLocation);
+    MapManager.selectDestination(place);
     this.showMapPlaceBanner(place);
+    await this.loadAndDrawRoute(place);
   },
 
   /**
-   * 施設詳細モーダルを表示
+   * 施設詳細モーダル表示 (スコア内訳バー付き)
    */
   showPlaceDetail(placeId) {
     const place = PlacesManager.getPlaceById(placeId);
@@ -506,12 +524,41 @@ window.CoolNaviApp = {
     const modalBody = document.getElementById('modal-place-detail-body');
     if (!modalBody) return;
 
+    // スコア内訳の計算
+    const distScore = evalData.distance <= 100 ? 35 : evalData.distance <= 300 ? 30 : evalData.distance <= 600 ? 24 : evalData.distance <= 1000 ? 15 : 8;
+    const acScore = place.airConditioner ? 25 : 0;
+    const seatScore = place.seat ? 15 : 0;
+    const crowdScore = place.crowdLevel === 'low' ? 10 : place.crowdLevel === 'medium' ? 5 : 0;
+
     modalBody.innerHTML = `
       <div class="detail-header">
-        <span class="badge ${evalData.badgeClass}">${evalData.rank}</span>
+        <span class="badge ${evalData.badgeClass}">${evalData.rank} (スコア: ${evalData.score}点)</span>
         <h2>${place.name}</h2>
         <div class="detail-distance-badge">
           🚶 徒歩 約<strong>${evalData.walkingMinutes}分</strong> (約${evalData.formattedDistance})
+        </div>
+      </div>
+
+      <!-- 休みやすさ評価スコアの内訳 -->
+      <div class="detail-section score-breakdown-section">
+        <h4>📊 休みやすさの評価内訳</h4>
+        <div class="score-bars">
+          <div class="score-bar-row">
+            <span class="bar-label">近さ (${distScore}/35点)</span>
+            <div class="bar-track"><div class="bar-fill" style="width: ${(distScore/35)*100}%;"></div></div>
+          </div>
+          <div class="score-bar-row">
+            <span class="bar-label">冷房 (${acScore}/25点)</span>
+            <div class="bar-track"><div class="bar-fill ac" style="width: ${(acScore/25)*100}%;"></div></div>
+          </div>
+          <div class="score-bar-row">
+            <span class="bar-label">座席 (${seatScore}/15点)</span>
+            <div class="bar-track"><div class="bar-fill seat" style="width: ${(seatScore/15)*100}%;"></div></div>
+          </div>
+          <div class="score-bar-row">
+            <span class="bar-label">混雑度 (${crowdScore}/10点)</span>
+            <div class="bar-track"><div class="bar-fill crowd" style="width: ${(crowdScore/10)*100}%;"></div></div>
+          </div>
         </div>
       </div>
 
@@ -539,7 +586,7 @@ window.CoolNaviApp = {
           <tr><th>住所</th><td>${place.address}</td></tr>
           <tr><th>営業時間</th><td>${place.openingHours}</td></tr>
           <tr><th>混雑傾向</th><td>${place.crowdLevel === 'low' ? '空いている' : place.crowdLevel === 'medium' ? '普通' : '混雑'}</td></tr>
-          <tr><th>情報更新</th><td>${place.lastUpdated || '最近'}</td></tr>
+          <tr><th>情報ソース</th><td>${place.isOpenDataLive ? 'OpenStreetMap オープンデータ' : 'プリセット避難施設'}</td></tr>
         </table>
         <p class="detail-desc-text">${place.description}</p>
       </div>
@@ -566,11 +613,11 @@ window.CoolNaviApp = {
       </div>
 
       <div class="detail-actions-fixed">
-        <button class="btn-primary" onclick="window.CoolNaviApp.startARForPlace(${place.id})">
-          🧭 ARで案内
+        <button class="btn-primary" onclick="window.CoolNaviApp.startARForPlace('${place.id}')">
+          🧭 道路沿いAR案内
         </button>
-        <button class="btn-secondary" onclick="window.CoolNaviApp.showOnMap(${place.id})">
-          🗺️ 地図で見る
+        <button class="btn-secondary" onclick="window.CoolNaviApp.showOnMap('${place.id}')">
+          🗺️ 経路地図
         </button>
       </div>
     `;
@@ -578,25 +625,18 @@ window.CoolNaviApp = {
     document.getElementById('modal-place-detail').classList.add('active');
   },
 
-  /**
-   * 状況報告モーダルを開く
-   */
   openReportModal() {
     if (!this.selectedPlace) return;
     document.getElementById('modal-report-target-name').textContent = this.selectedPlace.name;
     document.getElementById('modal-report').classList.add('active');
   },
 
-  /**
-   * 全てのモーダルを閉じる
-   */
   closeAllModals() {
     document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('active'));
   },
 
   /**
-   * AR案内を開始
-   * ※ ユーザーのタップアクション起点で呼び出されるため、iOSのパーミッション要求が通る
+   * 高性能道路沿いAR案内の開始
    */
   async startARForPlace(placeId) {
     const place = PlacesManager.getPlaceById(placeId);
@@ -609,31 +649,45 @@ window.CoolNaviApp = {
     const arTargetName = document.getElementById('ar-target-name');
     if (arTargetName) arTargetName.textContent = place.name;
 
-    // 目的地の設定
-    ARManager.setDestination(place, this.currentLocation);
+    // 道路ルートの取得
+    let route = this.currentRoute;
+    if (!route || route.isRoadNetwork === false) {
+      try {
+        route = await RoutingManager.getWalkingRoute(
+          this.currentLocation.latitude,
+          this.currentLocation.longitude,
+          place.latitude,
+          place.longitude
+        );
+        this.currentRoute = route;
+      } catch (e) {
+        console.warn('AR用ルート取得エラー:', e);
+      }
+    }
 
-    // カメラと向きセンサの起動
+    // ARセッションに目的地とルートを設定
+    ARManager.setNavigation(place, this.currentLocation, route);
+
     try {
       const result = await ARManager.startAR();
       const container = document.getElementById('ar-container');
       const toggleBtn = document.getElementById('btn-toggle-ar-camera');
 
       if (!result.camera) {
-        // カメラが起動できない場合はレーダーモードへ
         container.classList.add('radar-only-mode');
         if (toggleBtn) toggleBtn.textContent = '📷 カメラを起動';
-        this.showToast('カメラ映像なしで方向案内を表示します');
+        this.showToast('カメラ映像なしで道路方向案内を表示します');
       } else {
         container.classList.remove('radar-only-mode');
         if (toggleBtn) toggleBtn.textContent = '🧭 レーダー画面に切替';
       }
     } catch (e) {
-      console.warn('AR起動時の例外:', e);
+      console.warn('AR起動例外:', e);
     }
   },
 
   /**
-   * ARオーバーレイの描画更新
+   * ARオーバーレイの描画更新 (ターンバイターン指示 & 3D浮遊ピン)
    */
   renderAROverlay(state) {
     const arrowEl = document.getElementById('ar-direction-arrow');
@@ -643,8 +697,17 @@ window.CoolNaviApp = {
     const compassHeadingEl = document.getElementById('ar-compass-heading');
     const radarIndicator = document.getElementById('radar-target-dot');
 
+    // ターンバイターン道路指示カード要素
+    const turnCard = document.getElementById('ar-turn-card');
+    const turnIconEl = document.getElementById('ar-turn-icon');
+    const turnTextEl = document.getElementById('ar-turn-instruction');
+    const turnStepEl = document.getElementById('ar-turn-step-count');
+
+    // 3D空間浮遊ピン
+    const floatingPin = document.getElementById('ar-floating-pin');
+
+    // 1. 中央矢印の回転
     if (arrowEl) {
-      // 矢印の回転角度 (相対角度でスムーズに回転)
       arrowEl.style.transform = `rotate(${state.relativeAngle}deg)`;
       if (state.isStraight) {
         arrowEl.classList.add('straight-forward');
@@ -653,35 +716,54 @@ window.CoolNaviApp = {
       }
     }
 
+    // 2. ターンバイターン指示の更新
+    if (turnCard && state.currentStepInfo) {
+      turnCard.style.display = 'flex';
+      if (turnIconEl) turnIconEl.textContent = state.turnIcon;
+      if (turnTextEl) turnTextEl.textContent = state.stepInstruction;
+      if (turnStepEl) {
+        turnStepEl.textContent = `交差点 ${state.currentStepInfo.stepIndex + 1} / ${state.currentStepInfo.totalSteps}`;
+      }
+    }
+
+    // 3. 3D空間浮遊ピンのスクリーン投影
+    if (floatingPin) {
+      if (state.isVisibleInScreen && state.isCameraActive) {
+        floatingPin.style.display = 'flex';
+        floatingPin.style.transform = `translate(${state.screenXPercent * 3.5}px, ${state.screenYPercent * 2}px)`;
+        const pinTitle = floatingPin.querySelector('.pin-title');
+        const pinDist = floatingPin.querySelector('.pin-dist');
+        if (pinTitle) pinTitle.textContent = state.destination.name;
+        if (pinDist) pinDist.textContent = `あと ${state.formattedFinalDistance}`;
+      } else {
+        floatingPin.style.display = 'none';
+      }
+    }
+
+    // 4. 下部距離情報
     if (distEl) {
-      distEl.textContent = `あと ${state.formattedDistance}`;
+      distEl.textContent = `あと ${state.formattedFinalDistance}`;
     }
-
     if (walkEl) {
-      walkEl.textContent = `徒歩 約${state.walkingMinutes}分`;
+      walkEl.textContent = `徒歩 約${state.walkingMinutes}分 (道路沿い)`;
     }
-
     if (guideEl) {
-      guideEl.textContent = `${state.directionArrow} ${state.directionText}`;
+      guideEl.textContent = `${state.turnIcon} ${state.directionText}`;
     }
-
     if (compassHeadingEl) {
-      compassHeadingEl.textContent = `端末方位: ${Math.round(state.heading)}° / 目的地: ${Math.round(state.bearing)}°`;
+      compassHeadingEl.textContent = `端末方位: ${Math.round(state.heading)}° / 道路交差点: ${Math.round(state.targetBearing)}°`;
     }
 
-    // 2Dレーダー画面上のドット位置を更新
+    // 5. 2Dレーダー指示
     if (radarIndicator) {
       const rad = (state.relativeAngle - 90) * (Math.PI / 180);
-      const radius = 60; // レーダー円の半径
+      const radius = 60;
       const x = Math.cos(rad) * radius;
       const y = Math.sin(rad) * radius;
       radarIndicator.style.transform = `translate(${x}px, ${y}px)`;
     }
   },
 
-  /**
-   * 簡単なトースト通知表示
-   */
   showToast(message) {
     const existing = document.querySelector('.cool-toast');
     if (existing) existing.remove();
@@ -691,10 +773,7 @@ window.CoolNaviApp = {
     toast.textContent = message;
     document.body.appendChild(toast);
 
-    setTimeout(() => {
-      toast.classList.add('visible');
-    }, 10);
-
+    setTimeout(() => toast.classList.add('visible'), 10);
     setTimeout(() => {
       toast.classList.remove('visible');
       setTimeout(() => toast.remove(), 300);
@@ -702,7 +781,6 @@ window.CoolNaviApp = {
   }
 };
 
-// DOM読み込み完了時に起動
 document.addEventListener('DOMContentLoaded', () => {
   window.CoolNaviApp.init();
 });

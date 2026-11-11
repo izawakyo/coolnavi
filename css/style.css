@@ -1,22 +1,15 @@
 /**
- * style.css - CoolNavi スタイルシート
- * 
- * 仕様書の要件:
- * - スマホUIファースト (iPhone Safari 最適化, safe-area-inset 対応)
- * - イメージカラー: オレンジ (#FF7A00), 水色 (#0096C7, #48CAE4), 藍色 (#0B2545)
- * - 屋外・炎天下でも読みやすい高コントラストと大きなタップ領域
- * - Leaflet 地図カスタムマーカー
- * - AR HUD (ヘッドアップディスプレイ) と 2Dレーダー
+ * style.css - CoolNavi スタイルシート (オープンデータ・道路沿いARナビ統合版)
  */
 
 :root {
   /* ブランドカラー */
-  --color-primary: #0096C7;       /* クール水色 */
-  --color-primary-dark: #0077B6;  /* 濃い水色 */
-  --color-primary-light: #E0F7FA; /* 背景用アイスブルー */
-  --color-accent: #FF7A00;        /* エナジーオレンジ */
+  --color-primary: #0096C7;
+  --color-primary-dark: #0077B6;
+  --color-primary-light: #E0F7FA;
+  --color-accent: #FF7A00;
   --color-accent-hover: #E66D00;
-  --color-indigo: #0B2545;        /* 藍色 (メイン文字色・重要ヘッダー) */
+  --color-indigo: #0B2545;
   --color-indigo-soft: #134074;
   --color-text-main: #1D2D44;
   --color-text-muted: #5B6E80;
@@ -65,7 +58,6 @@ body {
   height: 100dvh;
 }
 
-/* モバイルビューポートコンテナ (PCではスマホ幅、スマホではフルスクリーン) */
 #app-root {
   width: 100%;
   max-width: 480px;
@@ -82,8 +74,8 @@ body {
 
 /* ================= 共通ヘッダー ================= */
 .app-header {
-  padding-top: calc(var(--sat) + 12px);
-  padding-bottom: 12px;
+  padding-top: calc(var(--sat) + 10px);
+  padding-bottom: 10px;
   padding-left: 16px;
   padding-right: 16px;
   background-color: var(--color-card-bg);
@@ -119,7 +111,7 @@ body {
 }
 
 .tagline {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--color-accent);
   background: rgba(255, 122, 0, 0.1);
@@ -127,11 +119,27 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* デモ位置トグルスイッチ */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opendata-status-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0369A1;
+  background-color: #E0F2FE;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  border: 1px solid #BAE6FD;
+}
+
+/* デモ位置トグル */
 .demo-switch {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
   user-select: none;
 }
@@ -141,8 +149,8 @@ body {
 }
 
 .demo-switch .slider {
-  width: 38px;
-  height: 20px;
+  width: 34px;
+  height: 18px;
   background-color: #CBD5E1;
   border-radius: 20px;
   position: relative;
@@ -152,8 +160,8 @@ body {
 .demo-switch .slider::before {
   content: "";
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background-color: white;
   top: 2px;
@@ -166,11 +174,11 @@ body {
 }
 
 .demo-switch input:checked + .slider::before {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 .demo-switch .switch-label {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-text-muted);
 }
@@ -199,7 +207,6 @@ body {
   display: block;
 }
 
-/* 地図とAR画面はパディングなしの全画面 */
 #tab-view-map.tab-view,
 #tab-view-ar.tab-view {
   padding: 0;
@@ -207,7 +214,6 @@ body {
 }
 
 /* ================= 1. ホーム画面 ================= */
-/* 気象ウィジェット */
 .weather-widget {
   background: linear-gradient(135deg, #0096C7 0%, #0077B6 100%);
   color: white;
@@ -220,7 +226,7 @@ body {
 .weather-top-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
 }
 
@@ -241,9 +247,16 @@ body {
 }
 
 .max-temp {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 500;
   opacity: 0.9;
+}
+
+.weather-badges-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .weather-alert {
@@ -253,7 +266,19 @@ body {
   font-weight: 700;
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+}
+
+.weather-alert.danger-high {
+  background-color: #991B1B;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+.weather-source-pill {
+  font-size: 0.68rem;
+  color: #E0F2FE;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 .weather-advice {
@@ -277,12 +302,24 @@ body {
   align-items: center;
   margin-bottom: 14px;
   font-size: 0.82rem;
-  color: var(--color-text-main);
   box-shadow: var(--shadow-sm);
 }
 
-.loc-text strong {
-  color: var(--color-indigo);
+.loc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon-opendata {
+  background-color: #E0F2FE;
+  border: 1px solid #BAE6FD;
+  color: #0369A1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
 }
 
 .btn-icon-refresh {
@@ -290,10 +327,9 @@ body {
   border: none;
   font-size: 1.1rem;
   cursor: pointer;
-  padding: 4px;
 }
 
-/* メインCTAボタン: 今、休める場所を探す */
+/* メインCTAボタン */
 .hero-cta-section {
   margin-bottom: 20px;
 }
@@ -310,29 +346,25 @@ body {
   align-items: center;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(255, 122, 0, 0.35);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-hero-cta:active {
   transform: scale(0.98);
-  box-shadow: 0 2px 10px rgba(255, 122, 0, 0.25);
 }
 
 .hero-cta-sub {
   font-size: 0.85rem;
   font-weight: 600;
   opacity: 0.95;
-  letter-spacing: 0.5px;
 }
 
 .hero-cta-main {
   font-size: 1.35rem;
   font-weight: 800;
-  letter-spacing: -0.3px;
   margin-top: 2px;
 }
 
-/* セクションタイトル */
+/* おすすめ第1位カード */
 .section-container {
   margin-bottom: 20px;
 }
@@ -355,14 +387,12 @@ body {
   color: var(--color-text-muted);
 }
 
-/* ホームおすすめ第1位カード */
 .top-place-card {
   background-color: var(--color-card-bg);
   border-radius: var(--radius-lg);
   padding: 16px;
   border: 2px solid var(--color-primary-light);
   box-shadow: var(--shadow-md);
-  position: relative;
 }
 
 .top-place-header {
@@ -393,7 +423,6 @@ body {
   justify-content: space-between;
   align-items: center;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
   margin-bottom: 10px;
 }
 
@@ -424,6 +453,12 @@ body {
   border: 1px solid #E2E8F0;
 }
 
+.tag-pill.opendata {
+  background-color: #E0F2FE;
+  color: #0369A1;
+  border-color: #BAE6FD;
+}
+
 .top-place-desc {
   font-size: 0.82rem;
   color: var(--color-text-muted);
@@ -448,11 +483,10 @@ body {
 
 .top-place-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 10px;
 }
 
-/* クイックボタングリッド */
 .quick-nav-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -470,11 +504,6 @@ body {
   cursor: pointer;
   text-align: left;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease;
-}
-
-.quick-btn:active {
-  transform: scale(0.97);
 }
 
 .btn-emoji {
@@ -508,7 +537,6 @@ body {
 .list-title-area .subtext {
   font-size: 0.8rem;
   color: var(--color-text-muted);
-  margin-top: 2px;
 }
 
 .sort-tabs {
@@ -529,7 +557,6 @@ body {
   color: var(--color-text-muted);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .sort-tab-btn.active {
@@ -538,7 +565,6 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-/* 施設カード */
 .places-list {
   display: flex;
   flex-direction: column;
@@ -551,6 +577,10 @@ body {
   padding: 16px;
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
+}
+
+.place-card.card-opendata {
+  border-left: 4px solid #0096C7;
 }
 
 .place-card-top {
@@ -576,13 +606,27 @@ body {
   line-height: 1.3;
 }
 
+.place-sub-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
 .place-badge {
-  display: inline-block;
   font-size: 0.7rem;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: var(--radius-full);
-  margin-top: 4px;
+}
+
+.opendata-mini-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background-color: #E0F2FE;
+  color: #0369A1;
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 
 .badge-super {
@@ -635,7 +679,7 @@ body {
 
 .place-card-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.3fr;
+  grid-template-columns: 1fr 1.2fr 1.4fr;
   gap: 8px;
   margin-top: 12px;
 }
@@ -650,11 +694,6 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  transition: opacity 0.15s;
-}
-
-.card-btn:active {
-  opacity: 0.8;
 }
 
 .card-btn.primary {
@@ -701,16 +740,9 @@ body {
   font-weight: 700;
   box-shadow: var(--shadow-md);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
-.map-fab:active {
-  transform: scale(0.96);
-}
-
-/* 地図ピンのカスタムスタイル */
+/* 地図マーカー */
 .current-location-marker-container {
   position: relative;
   width: 24px;
@@ -763,15 +795,18 @@ body {
   border-color: #FF7A00;
 }
 
+.place-marker-icon.opendata-place {
+  background-color: #E0F2FE;
+  border-color: #0284C7;
+}
+
 .marker-symbol {
   transform: rotate(45deg);
   font-size: 1.1rem;
 }
 
-/* ポップアップ */
 .map-popup-card {
   padding: 4px;
-  font-family: var(--font-family);
 }
 
 .popup-title {
@@ -786,11 +821,6 @@ body {
   flex-direction: column;
   gap: 2px;
   margin-bottom: 6px;
-}
-
-.popup-badge {
-  font-size: 0.7rem;
-  font-weight: 700;
 }
 
 .popup-dist {
@@ -823,7 +853,6 @@ body {
   cursor: pointer;
 }
 
-/* 地図下部バナー */
 .map-banner {
   position: absolute;
   bottom: calc(var(--sab) + 76px);
@@ -835,7 +864,6 @@ body {
   box-shadow: var(--shadow-lg);
   z-index: 20;
   display: none;
-  animation: slideUp 0.25s ease-out;
 }
 
 .map-banner.active {
@@ -867,7 +895,6 @@ body {
   font-size: 1.1rem;
   color: var(--color-text-muted);
   cursor: pointer;
-  padding: 2px;
 }
 
 .map-banner-actions {
@@ -876,7 +903,7 @@ body {
   gap: 8px;
 }
 
-/* ================= 4. AR案内画面 ================= */
+/* ================= 4. 高性能AR案内画面 ================= */
 #ar-container {
   width: 100%;
   height: 100%;
@@ -895,7 +922,7 @@ body {
   z-index: 1;
 }
 
-/* 2Dレーダー背景 (カメラ停止時や非対応時) */
+/* 2Dレーダー背景 */
 .ar-radar-bg {
   position: absolute;
   top: 0;
@@ -958,6 +985,66 @@ body {
   transition: transform 0.2s ease-out;
 }
 
+/* AR 3D空間浮遊ピン */
+.ar-floating-pin {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  z-index: 8;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  transition: transform 0.15s ease-out;
+  animation: float-pulse 2s infinite ease-in-out;
+}
+
+@keyframes float-pulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.pin-bubble {
+  background: rgba(11, 37, 69, 0.88);
+  border: 2px solid var(--color-accent);
+  padding: 8px 14px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(8px);
+}
+
+.pin-icon {
+  font-size: 1.4rem;
+}
+
+.pin-texts {
+  display: flex;
+  flex-direction: column;
+}
+
+.pin-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: white;
+  white-space: nowrap;
+}
+
+.pin-dist {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #FDBA74;
+}
+
+.pin-anchor-arrow {
+  color: var(--color-accent);
+  font-size: 1.1rem;
+  margin-top: -4px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
 /* AR HUD */
 .ar-hud {
   position: absolute;
@@ -976,12 +1063,17 @@ body {
   padding-top: calc(var(--sat) + 12px);
   padding-left: 16px;
   padding-right: 16px;
-  padding-bottom: 12px;
-  background: linear-gradient(180deg, rgba(11, 37, 69, 0.85) 0%, rgba(11, 37, 69, 0) 100%);
+  padding-bottom: 8px;
+  background: linear-gradient(180deg, rgba(11, 37, 69, 0.9) 0%, rgba(11, 37, 69, 0) 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
   pointer-events: auto;
+}
+
+.ar-top-buttons {
+  display: flex;
+  gap: 6px;
 }
 
 .ar-target-info {
@@ -990,14 +1082,13 @@ body {
 }
 
 .ar-target-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: #94A3B8;
   font-weight: 700;
-  text-transform: uppercase;
 }
 
 .ar-target-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: white;
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
@@ -1012,7 +1103,63 @@ body {
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
-  backdrop-filter: blur(4px);
+}
+
+.ar-btn-mode {
+  background: rgba(255, 122, 0, 0.25);
+  color: #FED7AA;
+  border: 1px solid rgba(255, 122, 0, 0.5);
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 道路沿いターンバイターン指示カード */
+.ar-turn-card {
+  margin: 8px 16px 0;
+  background: rgba(11, 37, 69, 0.92);
+  border: 2px solid #0096C7;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.turn-icon {
+  font-size: 2rem;
+  line-height: 1;
+  color: #38BDF8;
+  width: 36px;
+  text-align: center;
+}
+
+.turn-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.turn-instruction {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: white;
+}
+
+.turn-sub {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  font-weight: 600;
 }
 
 /* 中央ダイナミック矢印 */
@@ -1037,12 +1184,6 @@ body {
 
 .ar-arrow.straight-forward {
   color: #10B981;
-  animation: bounce-straight 1.5s infinite;
-}
-
-@keyframes bounce-straight {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
 }
 
 .arrow-svg {
@@ -1052,14 +1193,13 @@ body {
 
 .ar-guide-text {
   margin-top: 10px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 800;
   color: white;
-  background: rgba(11, 37, 69, 0.75);
+  background: rgba(11, 37, 69, 0.8);
   padding: 6px 16px;
   border-radius: var(--radius-full);
   backdrop-filter: blur(6px);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -1068,7 +1208,7 @@ body {
   padding-bottom: calc(var(--sab) + 76px);
   padding-left: 16px;
   padding-right: 16px;
-  background: linear-gradient(0deg, rgba(11, 37, 69, 0.9) 0%, rgba(11, 37, 69, 0) 100%);
+  background: linear-gradient(0deg, rgba(11, 37, 69, 0.95) 0%, rgba(11, 37, 69, 0) 100%);
   pointer-events: auto;
 }
 
@@ -1079,19 +1219,19 @@ body {
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(8px);
   border-radius: var(--radius-md);
-  padding: 12px;
+  padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .stat-big {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: white;
 }
 
 .stat-sub {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: #F8FAFC;
 }
@@ -1117,7 +1257,6 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
-  backdrop-filter: blur(4px);
 }
 
 /* ================= ボトムナビゲーションバー ================= */
@@ -1134,7 +1273,6 @@ body {
   justify-content: space-around;
   align-items: center;
   z-index: 100;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .nav-item {
@@ -1149,7 +1287,6 @@ body {
   gap: 2px;
   cursor: pointer;
   color: var(--color-text-muted);
-  transition: all 0.15s ease;
 }
 
 .nav-icon {
@@ -1164,10 +1301,6 @@ body {
 
 .nav-item.active {
   color: var(--color-primary-dark);
-}
-
-.nav-item.active .nav-icon {
-  transform: translateY(-2px);
 }
 
 /* ================= 汎用ボタン ================= */
@@ -1188,10 +1321,6 @@ body {
   min-height: 48px;
 }
 
-.btn-primary:active {
-  transform: scale(0.98);
-}
-
 .btn-secondary {
   background-color: #F1F5F9;
   color: var(--color-indigo);
@@ -1207,11 +1336,7 @@ body {
   min-height: 48px;
 }
 
-.btn-secondary:active {
-  background-color: #E2E8F0;
-}
-
-/* ================= モーダル ================= */
+/* ================= モーダル & 評価内訳バー ================= */
 .modal-overlay {
   position: absolute;
   top: 0;
@@ -1224,7 +1349,6 @@ body {
   justify-content: center;
   align-items: flex-end;
   backdrop-filter: blur(2px);
-  animation: fadeIn 0.2s ease-out;
 }
 
 .modal-overlay.active {
@@ -1241,7 +1365,6 @@ body {
   overflow-y: auto;
   position: relative;
   box-shadow: var(--shadow-lg);
-  animation: slideUp 0.25s ease-out;
 }
 
 .modal-close {
@@ -1258,7 +1381,6 @@ body {
   cursor: pointer;
 }
 
-/* 施設詳細モーダル内スタイル */
 .detail-header {
   margin-bottom: 16px;
   padding-right: 32px;
@@ -1269,7 +1391,7 @@ body {
   font-weight: 800;
   color: var(--color-indigo);
   margin-top: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .detail-distance-badge {
@@ -1278,8 +1400,54 @@ body {
   font-weight: 600;
 }
 
+/* 評価内訳プログレスバー */
+.score-breakdown-section {
+  background-color: #F8FAFC;
+  border-radius: var(--radius-md);
+  padding: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.score-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.score-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bar-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.bar-track {
+  width: 100%;
+  height: 8px;
+  background-color: #E2E8F0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.bar-fill.ac { background-color: #0284C7; }
+.bar-fill.seat { background-color: #F59E0B; }
+.bar-fill.crowd { background-color: #10B981; }
+
 .detail-section {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .detail-section h4 {
@@ -1304,14 +1472,8 @@ body {
   border: 1px solid var(--color-border);
 }
 
-.grid-item.checked {
-  color: var(--color-text-main);
-}
-
-.grid-item.cross {
-  color: #94A3B8;
-  background-color: #F1F5F9;
-}
+.grid-item.checked { color: var(--color-text-main); }
+.grid-item.cross { color: #94A3B8; background-color: #F1F5F9; }
 
 .detail-info-table {
   width: 100%;
@@ -1325,12 +1487,10 @@ body {
   text-align: left;
   color: var(--color-text-muted);
   padding: 6px 0;
-  font-weight: 600;
 }
 
 .detail-info-table td {
   padding: 6px 0;
-  color: var(--color-text-main);
 }
 
 .detail-desc-text {
@@ -1395,41 +1555,17 @@ body {
 
 .detail-actions-fixed {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 10px;
-  margin-top: 20px;
-}
-
-/* 報告モーダル */
-.report-modal-card {
-  text-align: center;
-}
-
-.report-modal-header h3 {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: var(--color-indigo);
-}
-
-.report-target-name {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-primary-dark);
-  margin-top: 4px;
-}
-
-.report-sub {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.report-buttons-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
   margin-top: 18px;
 }
 
+/* 報告モーダル */
+.report-modal-card { text-align: center; }
+.report-modal-header h3 { font-size: 1.2rem; font-weight: 800; color: var(--color-indigo); }
+.report-target-name { font-size: 0.95rem; font-weight: 700; color: var(--color-primary-dark); margin-top: 4px; }
+.report-sub { font-size: 0.75rem; color: var(--color-text-muted); }
+.report-buttons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
 .report-choice-btn {
   background-color: #F8FAFC;
   border: 2px solid var(--color-border);
@@ -1440,29 +1576,18 @@ body {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
-
 .report-choice-btn:active {
   background-color: var(--color-primary-light);
   border-color: var(--color-primary);
-  transform: scale(0.96);
 }
+.report-icon { font-size: 1.8rem; }
+.report-text { font-size: 0.85rem; font-weight: 700; color: var(--color-indigo); }
 
-.report-icon {
-  font-size: 1.8rem;
-}
-
-.report-text {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--color-indigo);
-}
-
-/* ================= トースト通知 & スピナー ================= */
+/* トースト通知 & スピナー */
 .cool-toast {
   position: absolute;
-  top: calc(var(--sat) + 60px);
+  top: calc(var(--sat) + 55px);
   left: 50%;
   transform: translateX(-50%) translateY(-20px);
   background-color: rgba(11, 37, 69, 0.92);
@@ -1504,16 +1629,4 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes spin { to { transform: rotate(360deg); } }

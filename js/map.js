@@ -1,12 +1,12 @@
 /**
- * map.js - Leaflet + OpenStreetMap 地図制御
+ * map.js - Leaflet + OpenStreetMap 地図制御 & 道路沿い歩行者ルート描画
  * 
- * 仕様書の要件:
- * - Leaflet + OpenStreetMap を使用
- * - 現在地 (青いピン・パルス円) のリアルタイム表示
- * - 涼み場所ピンの表示 (おすすめ度に応じたスタイル、ポップアップ)
- * - 選択した目的地との間の方向線・ハイライト
- * - モバイルでのスムーズな操作感
+ * 機能:
+ * - Leaflet + OpenStreetMap 地図
+ * - 現在地マーカー (青パルス円)
+ * - 涼み場所ピン (おすすめ度別バッジ)
+ * - 道路網に沿った正確な歩行者ルートポリラインの描画 (OSRMオープンデータ連携)
+ * - ターンバイターン曲がり角マーカー
  */
 
 const MapManager = {
@@ -14,51 +14,45 @@ const MapManager = {
   currentLocationMarker: null,
   currentAccuracyCircle: null,
   placeMarkers: {},
-  destinationLine: null,
+  routeLayerGroup: null,
   selectedPlaceId: null,
   onPlaceSelectCallback: null,
 
   /**
    * 地図の初期化
-   * @param {string} containerId 地図を表示する要素のID
-   * @param {Function} onPlaceSelect ピンタップ時のコールバック
    */
   initMap(containerId = 'map-container', onPlaceSelect = null) {
     if (this.map) return;
 
     this.onPlaceSelectCallback = onPlaceSelect;
 
-    // デフォルトの中心位置 (東京駅周辺)
     const defaultLat = 35.681236;
     const defaultLng = 139.767125;
 
     this.map = L.map(containerId, {
       center: [defaultLat, defaultLng],
       zoom: 15,
-      zoomControl: false // スマホ向けに右下に再配置
+      zoomControl: false
     });
 
-    // ズームコントロールを右下に配置 (片手操作しやすい)
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
-    // OpenStreetMap タイルレイヤー
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(this.map);
+
+    this.routeLayerGroup = L.layerGroup().addTo(this.map);
   },
 
   /**
-   * 現在地マーカーの更新・表示
-   * @param {Object} location { latitude, longitude, accuracy }
-   * @param {boolean} panToCenter 地図の中心を現在地へ移動するか
+   * 現在地マーカーの更新
    */
   updateCurrentLocation(location, panToCenter = false) {
     if (!this.map || !location) return;
 
     const latLng = [location.latitude, location.longitude];
 
-    // 現在地用カスタムHTMLアイコン (青い点と波紋アニメーション)
     const currentLocIcon = L.divIcon({
       className: 'current-location-marker-container',
       html: `
@@ -78,7 +72,6 @@ const MapManager = {
       this.currentLocationMarker.setLatLng(latLng);
     }
 
-    // 精度サークルの表示
     if (location.accuracy && location.accuracy > 0) {
       if (!this.currentAccuracyCircle) {
         this.currentAccuracyCircle = L.circle(latLng, {
@@ -97,33 +90,27 @@ const MapManager = {
     if (panToCenter) {
       this.map.setView(latLng, 16);
     }
-
-    // 目的地選択中ならラインを更新
-    if (this.selectedPlaceId) {
-      this.updateDestinationLine();
-    }
   },
 
   /**
    * 涼み場所のピン一覧を描画
-   * @param {Array} places 評価付き施設配列
    */
   renderPlaceMarkers(places) {
     if (!this.map) return;
 
-    // 既存マーカーのクリア
     Object.values(this.placeMarkers).forEach(marker => this.map.removeLayer(marker));
     this.placeMarkers = {};
 
     places.forEach(place => {
       const isTopScore = place.evaluation && place.evaluation.score >= 80;
-      const markerClass = isTopScore ? 'place-marker-icon super-place' : 'place-marker-icon';
+      const isOpenData = place.isOpenDataLive;
+      const markerClass = isTopScore ? 'place-marker-icon super-place' : (isOpenData ? 'place-marker-icon opendata-place' : 'place-marker-icon');
 
       const customIcon = L.divIcon({
         className: 'place-marker-container',
         html: `
           <div class="${markerClass}">
-            <span class="marker-symbol">❄️</span>
+            <span class="marker-symbol">${isOpenData ? '📍' : '❄️'}</span>
           </div>
         `,
         iconSize: [36, 36],
@@ -135,7 +122,6 @@ const MapManager = {
         icon: customIcon
       }).addTo(this.map);
 
-      // ポップアップ内容
       const popupContent = `
         <div class="map-popup-card">
           <div class="popup-title">${place.name}</div>
@@ -150,8 +136,8 @@ const MapManager = {
             ${place.seat ? '<span class="feat-tag">🪑 座席</span>' : ''}
             ${place.toilet ? '<span class="feat-tag">🚻 トイレ</span>' : ''}
           </div>
-          <button class="popup-select-btn" onclick="window.CoolNaviApp.selectPlaceFromMap(${place.id})">
-            ここへ行く・詳細
+          <button class="popup-select-btn" onclick="window.CoolNaviApp.selectPlaceFromMap('${place.id}')">
+            ここへ行く・道路沿い案内
           </button>
         </div>
       `;
@@ -169,16 +155,75 @@ const MapManager = {
   },
 
   /**
-   * 目的地を選択しハイライト & ライン描画
-   * @param {Object} place 
-   * @param {Object} currentLocation 
+   * 実際の道路網に沿ったルートポリラインを描画
+   * @param {Object} routeData OSRMのルートデータ
+   * @param {boolean} autoFit 画面内にルートを自動フィットさせるか
    */
-  selectDestination(place, currentLocation) {
-    this.selectedPlaceId = place ? place.id : null;
-    this.updateDestinationLine(currentLocation);
+  drawRoadRoute(routeData, autoFit = true) {
+    if (!this.map || !this.routeLayerGroup) return;
 
+    this.routeLayerGroup.clearLayers();
+
+    if (!routeData || !routeData.coordinates || routeData.coordinates.length < 2) return;
+
+    // 1. ルートのアウトライン (影・背景線)
+    const outlinePolyline = L.polyline(routeData.coordinates, {
+      color: '#0B2545',
+      weight: 8,
+      opacity: 0.35,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    this.routeLayerGroup.addLayer(outlinePolyline);
+
+    // 2. メインの道路沿いルートライン (クールブルー)
+    const mainPolyline = L.polyline(routeData.coordinates, {
+      color: '#0096C7',
+      weight: 5,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+    this.routeLayerGroup.addLayer(mainPolyline);
+
+    // 3. ルート上の曲がり角 (ターンポイント) に小さな目印アイコンを配置
+    if (routeData.steps && routeData.steps.length > 2) {
+      routeData.steps.slice(1, -1).forEach(step => {
+        const turnDot = L.circleMarker(step.location, {
+          radius: 5,
+          color: '#FFFFFF',
+          fillColor: '#FF7A00',
+          fillOpacity: 1,
+          weight: 2
+        });
+        turnDot.bindTooltip(step.instruction, { direction: 'top', offset: [0, -6] });
+        this.routeLayerGroup.addLayer(turnDot);
+      });
+    }
+
+    if (autoFit) {
+      this.map.fitBounds(mainPolyline.getBounds(), {
+        padding: [50, 50],
+        maxZoom: 17
+      });
+    }
+  },
+
+  /**
+   * ルート描画を消去
+   */
+  clearRoute() {
+    if (this.routeLayerGroup) {
+      this.routeLayerGroup.clearLayers();
+    }
+  },
+
+  /**
+   * 目的地を選択
+   */
+  selectDestination(place) {
+    this.selectedPlaceId = place ? place.id : null;
     if (place && this.map) {
-      this.map.setView([place.latitude, place.longitude], 16);
       if (this.placeMarkers[place.id]) {
         this.placeMarkers[place.id].openPopup();
       }
@@ -186,37 +231,7 @@ const MapManager = {
   },
 
   /**
-   * 現在地と目的地を結ぶガイドラインを描画
-   */
-  updateDestinationLine(currentLocation) {
-    if (!this.map) return;
-
-    if (this.destinationLine) {
-      this.map.removeLayer(this.destinationLine);
-      this.destinationLine = null;
-    }
-
-    if (!this.selectedPlaceId) return;
-
-    const marker = this.placeMarkers[this.selectedPlaceId];
-    const loc = currentLocation || LocationManager.currentLocation;
-
-    if (marker && loc) {
-      const start = [loc.latitude, loc.longitude];
-      const end = marker.getLatLng();
-
-      this.destinationLine = L.polyline([start, end], {
-        color: '#FF7A00',
-        weight: 4,
-        opacity: 0.8,
-        dashArray: '8, 8',
-        lineCap: 'round'
-      }).addTo(this.map);
-    }
-  },
-
-  /**
-   * タブ切り替え時等に地図表示サイズを再計算
+   * タブ切り替え時等に地図サイズ再計算
    */
   invalidateSize() {
     if (this.map) {

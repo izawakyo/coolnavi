@@ -145,3 +145,4 @@ const LocationManager = {
     return this.currentLocation;
   }
 };
+

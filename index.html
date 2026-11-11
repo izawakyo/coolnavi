@@ -8,6 +8,11 @@
   <meta name="theme-color" content="#0096C7">
   <title>CoolNavi - 近くの涼み場所へ、今休もう</title>
 
+  <!-- PWA & アイコン -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="images/icon.svg">
+  <link rel="apple-touch-icon" href="images/icon.svg">
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <!-- Google Fonts -->
@@ -30,7 +35,9 @@
         <span class="tagline">今、休もう</span>
       </div>
       <div class="header-right">
-        <!-- PCテスト・GPSオフ時用のデモモードスイッチ -->
+        <!-- オープンデータ連動インジケーター -->
+        <span id="opendata-live-badge" class="opendata-status-pill" title="オープンデータAPI接続状態">OSM+気象連動</span>
+        <!-- デモ位置スイッチ -->
         <label class="demo-switch" title="東京駅周辺のテスト位置でシミュレーションします">
           <input type="checkbox" id="demo-location-toggle">
           <span class="slider"></span>
@@ -52,7 +59,10 @@
               <span class="current-temp" id="weather-temp">33℃</span>
               <span class="max-temp" id="weather-max-temp">最高 36℃</span>
             </div>
-            <div id="weather-alert-badge" class="weather-alert">⚠️ 熱中症: 厳重警戒</div>
+            <div class="weather-badges-col">
+              <div id="weather-alert-badge" class="weather-alert">⚠️ 熱中症: 厳重警戒</div>
+              <span id="weather-source-badge" class="weather-source-pill">気象オープンデータ</span>
+            </div>
           </div>
           <p id="weather-message" class="weather-advice">
             「まだ大丈夫」と我慢せず、早めに涼しい場所でクールダウンしましょう。
@@ -64,7 +74,10 @@
           <div id="current-location-status" class="loc-text">
             📍 現在地を取得中...
           </div>
-          <button id="btn-refresh-location" class="btn-icon-refresh" title="現在地を再取得">🔄</button>
+          <div class="loc-actions">
+            <button id="btn-fetch-opendata" class="btn-icon-opendata" title="周辺オープンデータを再取得">🌐 検索</button>
+            <button id="btn-refresh-location" class="btn-icon-refresh" title="現在地を再取得">🔄</button>
+          </div>
         </div>
 
         <!-- メインCTAボタン: 今、休める場所を探す -->
@@ -94,15 +107,15 @@
           <button id="btn-quick-map" class="quick-btn map-btn">
             <span class="btn-emoji">🗺️</span>
             <div class="btn-texts">
-              <span class="title">地図で見る</span>
-              <span class="sub">周辺スポットを全体俯瞰</span>
+              <span class="title">道路経路地図</span>
+              <span class="sub">道路に沿った移動ルート</span>
             </div>
           </button>
           <button id="btn-quick-ar" class="quick-btn ar-btn">
             <span class="btn-emoji">🧭</span>
             <div class="btn-texts">
-              <span class="title">ARで案内</span>
-              <span class="sub">カメラで方向をすぐ確認</span>
+              <span class="title">道路沿いAR</span>
+              <span class="sub">交差点や曲がり角を案内</span>
             </div>
           </button>
         </div>
@@ -113,9 +126,8 @@
         <div class="list-header">
           <div class="list-title-area">
             <h2>涼み場所をさがす</h2>
-            <p class="subtext">近さだけでなく「休みやすさ」でご案内します</p>
+            <p class="subtext">近さだけでなく「今の自分が休みやすい場所」をご案内</p>
           </div>
-          <!-- ソートタブ -->
           <div class="sort-tabs">
             <button id="sort-recommend-btn" class="sort-tab-btn active">🌟 休みやすさ順</button>
             <button id="sort-distance-btn" class="sort-tab-btn">🚶 近い順</button>
@@ -148,13 +160,13 @@
         </div>
       </section>
 
-      <!-- ================= 4. AR案内画面 ================= -->
+      <!-- ================= 4. 高性能AR案内画面 ================= -->
       <section id="tab-view-ar" class="tab-view">
         <div id="ar-container">
           <!-- カメラ映像 -->
           <video id="ar-video" autoplay playsinline muted></video>
 
-          <!-- カメラ非使用時の2Dレーダー背景 -->
+          <!-- 2Dレーダー背景 (カメラ停止時) -->
           <div class="ar-radar-bg">
             <div class="radar-circle circle-1"></div>
             <div class="radar-circle circle-2"></div>
@@ -162,6 +174,18 @@
             <div class="radar-crosshair-v"></div>
             <div id="radar-target-dot" class="radar-blip"></div>
             <div class="radar-self-dot"></div>
+          </div>
+
+          <!-- AR空間浮遊ピン (カメラ映像内に浮かび上がるピン) -->
+          <div id="ar-floating-pin" class="ar-floating-pin">
+            <div class="pin-bubble">
+              <span class="pin-icon">❄️</span>
+              <div class="pin-texts">
+                <span class="pin-title">施設名</span>
+                <span class="pin-dist">あと --m</span>
+              </div>
+            </div>
+            <div class="pin-anchor-arrow">▼</div>
           </div>
 
           <!-- AR HUD (ヘッドアップディスプレイ) -->
@@ -172,17 +196,29 @@
                 <span class="ar-target-label">目的地</span>
                 <span id="ar-target-name" class="ar-target-title">施設を選択してください</span>
               </div>
-              <button id="btn-close-ar" class="ar-btn-close">✕ 閉じる</button>
+              <div class="ar-top-buttons">
+                <button id="btn-toggle-ar-mode" class="ar-btn-mode">🛣️ 道路ナビ中</button>
+                <button id="btn-close-ar" class="ar-btn-close">✕ 閉じる</button>
+              </div>
+            </div>
+
+            <!-- 道路沿いターンバイターン指示カード (曲がり角案内) -->
+            <div id="ar-turn-card" class="ar-turn-card">
+              <div id="ar-turn-icon" class="turn-icon">↱</div>
+              <div class="turn-body">
+                <div id="ar-turn-instruction" class="turn-instruction">次の交差点を右折</div>
+                <div id="ar-turn-step-count" class="turn-sub">交差点案内</div>
+              </div>
             </div>
 
             <!-- 中央ダイナミック矢印ガイド -->
             <div class="ar-center-guide">
               <div id="ar-direction-arrow" class="ar-arrow">
                 <svg viewBox="0 0 100 100" class="arrow-svg">
-                  <path d="M50 10 L85 75 L50 60 L15 75 Z" fill="currentColor"/>
+                  <path d="M50 8 L88 78 L50 62 L12 78 Z" fill="currentColor"/>
                 </svg>
               </div>
-              <div id="ar-guide-message" class="ar-guide-text">端末を水平に向けてください</div>
+              <div id="ar-guide-message" class="ar-guide-text">端末を向けてください</div>
             </div>
 
             <!-- 下部情報パネル -->
@@ -196,7 +232,7 @@
                 </div>
               </div>
               <div id="ar-compass-heading" class="ar-compass-text">
-                方位を取得中...
+                端末方位を取得中...
               </div>
               <div class="ar-controls-row">
                 <button id="btn-toggle-ar-camera" class="btn-ar-switch">
@@ -277,9 +313,10 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
-  <!-- CoolNavi スクリプト群 -->
+  <!-- CoolNavi スクリプト群 (依存関係順) -->
   <script src="js/recommendation.js"></script>
   <script src="js/location.js"></script>
+  <script src="js/routing.js"></script>
   <script src="js/places.js"></script>
   <script src="js/map.js"></script>
   <script src="js/ar.js"></script>

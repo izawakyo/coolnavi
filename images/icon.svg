@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0096C7"/>
+      <stop offset="60%" stop-color="#0077B6"/>
+      <stop offset="100%" stop-color="#0B2545"/>
+    </linearGradient>
+    <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9800"/>
+      <stop offset="100%" stop-color="#FF7A00"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0B2545" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- 背景角丸スクエア (iOSアイコン風) -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)"/>
+
+  <!-- コンパス外環リング (クールブルー) -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(255, 255, 255, 0.25)" stroke-width="8" stroke-dasharray="16 12"/>
+  <circle cx="256" cy="256" r="150" fill="rgba(255, 255, 255, 0.08)"/>
+
+  <!-- 雪の結晶オーナメント (背景装飾) -->
+  <g stroke="rgba(224, 247, 250, 0.45)" stroke-width="6" stroke-linecap="round">
+    <line x1="256" y1="120" x2="256" y2="392"/>
+    <line x1="120" y1="256" x2="392" y2="256"/>
+    <line x1="160" y1="160" x2="352" y2="352"/>
+    <line x1="160" y1="352" x2="352" y2="160"/>
+  </g>
+
+  <!-- ダイナミックなコンパスナビゲーション矢印 (エナジーオレンジ) -->
+  <g filter="url(#shadow)">
+    <!-- 北/進行方向の針 (オレンジ) -->
+    <polygon points="256,90 326,270 256,236" fill="url(#arrowGrad)"/>
+    <polygon points="256,90 186,270 256,236" fill="#FFA726"/>
+
+    <!-- 南方向の針 (クールホワイト) -->
+    <polygon points="256,422 326,270 256,236" fill="#E2E8F0"/>
+    <polygon points="256,422 186,270 256,236" fill="#FFFFFF"/>
+
+    <!-- センターハブ -->
+    <circle cx="256" cy="256" r="28" fill="#FFFFFF"/>
+    <circle cx="256" cy="256" r="16" fill="#0B2545"/>
+    <circle cx="256" cy="256" r="7" fill="#00B4D8"/>
+  </g>
+</svg>

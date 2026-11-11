@@ -193,3 +193,4 @@ function calculateRecommendationScore(place, currentLocation) {
     primaryReason: reasons.length > 0 ? reasons.join('・') : "涼みスポット"
   };
 }
+

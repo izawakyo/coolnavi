@@ -1,0 +1,22 @@
+{
+  "name": "CoolNavi - 涼み場所ナビゲーション",
+  "short_name": "CoolNavi",
+  "description": "暑さを我慢せず、今休める場所を素早く探せる涼み場所ナビ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0B2545",
+  "theme_color": "#0096C7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
