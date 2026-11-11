@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0096C7">
-  <title>CoolNavi - 近くの涼み場所へ、今休もう</title>
+  <title>CoolNavi - クーリングシェルター指定暑熱避難所ナビ</title>
 
   <!-- PWA & アイコン -->
   <link rel="manifest" href="manifest.json">
@@ -29,19 +29,19 @@
     <header class="app-header">
       <div class="header-left">
         <div class="app-logo">
-          <span class="logo-icon">❄️</span>
+          <span class="logo-icon">🏛️</span>
           <span class="logo-text">CoolNavi</span>
         </div>
-        <span class="tagline">今、休もう</span>
+        <span class="tagline">クーリングシェルター案内</span>
       </div>
       <div class="header-right">
         <!-- オープンデータ連動インジケーター -->
-        <span id="opendata-live-badge" class="opendata-status-pill" title="オープンデータAPI接続状態">OSM+気象連動</span>
+        <span id="opendata-live-badge" class="opendata-status-pill" title="クーリングシェルターオープンデータ接続">🏛️ シェルター連動</span>
         <!-- デモ位置スイッチ -->
         <label class="demo-switch" title="東京駅周辺のテスト位置でシミュレーションします">
           <input type="checkbox" id="demo-location-toggle">
           <span class="slider"></span>
-          <span class="switch-label">デモ位置</span>
+          <span class="switch-label">テスト位置</span>
         </label>
       </div>
     </header>
@@ -51,7 +51,7 @@
 
       <!-- ================= 1. ホーム画面 ================= -->
       <section id="tab-view-home" class="tab-view active">
-        <!-- 気象情報カード -->
+        <!-- 気象・熱中症情報カード -->
         <div class="weather-widget">
           <div class="weather-top-row">
             <div class="temp-badge">
@@ -65,39 +65,39 @@
             </div>
           </div>
           <p id="weather-message" class="weather-advice">
-            「まだ大丈夫」と我慢せず、早めに涼しい場所でクールダウンしましょう。
+            「まだ大丈夫」と我慢せず、近くの指定暑熱避難施設（クーリングシェルター）で早めに体を冷やしましょう。
           </p>
         </div>
 
         <!-- 現在地ステータスバー -->
         <div class="location-status-bar">
           <div id="current-location-status" class="loc-text">
-            📍 現在地を取得中...
+            📍 現在地から避難施設を検索中...
           </div>
           <div class="loc-actions">
-            <button id="btn-fetch-opendata" class="btn-icon-opendata" title="周辺オープンデータを再取得">🌐 検索</button>
+            <button id="btn-fetch-opendata" class="btn-icon-opendata" title="周辺オープンデータを再取得">🏛️ 再検索</button>
             <button id="btn-refresh-location" class="btn-icon-refresh" title="現在地を再取得">🔄</button>
           </div>
         </div>
 
-        <!-- メインCTAボタン: 今、休める場所を探す -->
+        <!-- メインCTAボタン: 今すぐ近くのクーリングシェルターを探す -->
         <div class="hero-cta-section">
           <button id="btn-find-places" class="btn-hero-cta">
             <span class="hero-cta-sub">暑さを我慢しないで</span>
-            <span class="hero-cta-main">今、休める場所を探す ➔</span>
+            <span class="hero-cta-main">近くのクーリングシェルターを探す ➔</span>
           </button>
         </div>
 
-        <!-- おすすめの涼み場所 (第1位ハイライト) -->
+        <!-- おすすめのクーリングシェルター (第1位ハイライト) -->
         <div class="section-container">
           <div class="section-title-wrap">
-            <h3 class="section-title">🌟 最も休みやすい場所</h3>
-            <span class="section-hint">休みやすさ総合評価</span>
+            <h3 class="section-title">🏛️ 現在地から一番休みやすい避難施設</h3>
+            <span class="section-hint">休みやすさ・設備総合評価</span>
           </div>
           <div id="home-top-place-card" class="top-place-card">
             <div class="loading-spinner-wrap">
               <div class="spinner"></div>
-              <p>近くの涼み場所を計算中...</p>
+              <p>近くの避難施設を計算中...</p>
             </div>
           </div>
         </div>
@@ -107,26 +107,26 @@
           <button id="btn-quick-map" class="quick-btn map-btn">
             <span class="btn-emoji">🗺️</span>
             <div class="btn-texts">
-              <span class="title">道路経路地図</span>
-              <span class="sub">道路に沿った移動ルート</span>
+              <span class="title">避難経路地図</span>
+              <span class="sub">道路に沿った安全ルート</span>
             </div>
           </button>
           <button id="btn-quick-ar" class="quick-btn ar-btn">
             <span class="btn-emoji">🧭</span>
             <div class="btn-texts">
-              <span class="title">道路沿いAR</span>
-              <span class="sub">交差点や曲がり角を案内</span>
+              <span class="title">道路沿いAR案内</span>
+              <span class="sub">交差点や曲がり角を指示</span>
             </div>
           </button>
         </div>
       </section>
 
-      <!-- ================= 2. 涼み場所検索一覧画面 ================= -->
+      <!-- ================= 2. クーリングシェルター検索一覧画面 ================= -->
       <section id="tab-view-list" class="tab-view">
         <div class="list-header">
           <div class="list-title-area">
-            <h2>涼み場所をさがす</h2>
-            <p class="subtext">近さだけでなく「今の自分が休みやすい場所」をご案内</p>
+            <h2>クーリングシェルターをさがす</h2>
+            <p class="subtext">自治体指定暑熱避難所オープンデータより現在地周辺をご案内</p>
           </div>
           <div class="sort-tabs">
             <button id="sort-recommend-btn" class="sort-tab-btn active">🌟 休みやすさ順</button>
@@ -138,7 +138,7 @@
         <div id="places-list-container" class="places-list">
           <div class="loading-spinner-wrap">
             <div class="spinner"></div>
-            <p>涼み場所を読み込み中...</p>
+            <p>避難施設データを読み込み中...</p>
           </div>
         </div>
       </section>
@@ -179,9 +179,9 @@
           <!-- AR空間浮遊ピン (カメラ映像内に浮かび上がるピン) -->
           <div id="ar-floating-pin" class="ar-floating-pin">
             <div class="pin-bubble">
-              <span class="pin-icon">❄️</span>
+              <span class="pin-icon">🏛️</span>
               <div class="pin-texts">
-                <span class="pin-title">施設名</span>
+                <span class="pin-title">クーリングシェルター</span>
                 <span class="pin-dist">あと --m</span>
               </div>
             </div>
@@ -193,7 +193,7 @@
             <!-- 上部バー -->
             <div class="ar-top-bar">
               <div class="ar-target-info">
-                <span class="ar-target-label">目的地</span>
+                <span class="ar-target-label">避難目的地</span>
                 <span id="ar-target-name" class="ar-target-title">施設を選択してください</span>
               </div>
               <div class="ar-top-buttons">
@@ -253,8 +253,8 @@
         <span class="nav-label">ホーム</span>
       </button>
       <button class="nav-item" data-tab="list">
-        <span class="nav-icon">🔍</span>
-        <span class="nav-label">さがす</span>
+        <span class="nav-icon">🏛️</span>
+        <span class="nav-label">避難所一覧</span>
       </button>
       <button class="nav-item" data-tab="map">
         <span class="nav-icon">🗺️</span>
@@ -278,14 +278,14 @@
       </div>
     </div>
 
-    <!-- 利用状況報告モーダル (仕様書第17項) -->
+    <!-- 利用状況報告モーダル -->
     <div id="modal-report" class="modal-overlay">
       <div class="modal-card report-modal-card">
         <button class="modal-close" aria-label="閉じる">✕</button>
         <div class="report-modal-header">
-          <h3>今の状況を報告</h3>
+          <h3>避難所の状況を報告</h3>
           <p id="modal-report-target-name" class="report-target-name">○○施設</p>
-          <span class="report-sub">1タップで他のユーザーと共有できます</span>
+          <span class="report-sub">1タップで現在の混雑・冷房状況を共有</span>
         </div>
         <div class="report-buttons-grid">
           <button class="report-choice-btn" data-type="seated">

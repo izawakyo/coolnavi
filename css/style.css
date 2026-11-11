@@ -1,5 +1,5 @@
 /**
- * style.css - CoolNavi スタイルシート (オープンデータ・道路沿いARナビ統合版)
+ * style.css - CoolNavi スタイルシート (クーリングシェルター指定避難施設対応版)
  */
 
 :root {
@@ -122,7 +122,7 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .opendata-status-pill {
@@ -135,7 +135,6 @@ body {
   border: 1px solid #BAE6FD;
 }
 
-/* デモ位置トグル */
 .demo-switch {
   display: flex;
   align-items: center;
@@ -359,12 +358,12 @@ body {
 }
 
 .hero-cta-main {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 800;
   margin-top: 2px;
 }
 
-/* おすすめ第1位カード */
+/* おすすめクーリングシェルター第1位カード */
 .section-container {
   margin-bottom: 20px;
 }
@@ -377,7 +376,7 @@ body {
 }
 
 .section-title {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--color-indigo);
 }
@@ -453,7 +452,7 @@ body {
   border: 1px solid #E2E8F0;
 }
 
-.tag-pill.opendata {
+.tag-pill.water {
   background-color: #E0F2FE;
   color: #0369A1;
   border-color: #BAE6FD;
@@ -483,7 +482,7 @@ body {
 
 .top-place-actions {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1.5fr 1fr;
   gap: 10px;
 }
 
@@ -523,7 +522,7 @@ body {
   color: var(--color-text-muted);
 }
 
-/* ================= 2. 涼み場所検索一覧画面 ================= */
+/* ================= 2. クーリングシェルター検索一覧画面 ================= */
 .list-header {
   margin-bottom: 16px;
 }
@@ -579,8 +578,8 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-.place-card.card-opendata {
-  border-left: 4px solid #0096C7;
+.place-card.card-shelter {
+  border-left: 4px solid var(--color-primary);
 }
 
 .place-card-top {
@@ -620,12 +619,12 @@ body {
   border-radius: var(--radius-full);
 }
 
-.opendata-mini-badge {
+.shelter-authority-pill {
   font-size: 0.65rem;
   font-weight: 700;
   background-color: #E0F2FE;
   color: #0369A1;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
@@ -742,7 +741,6 @@ body {
   cursor: pointer;
 }
 
-/* 地図マーカー */
 .current-location-marker-container {
   position: relative;
   width: 24px;
@@ -821,6 +819,11 @@ body {
   flex-direction: column;
   gap: 2px;
   margin-bottom: 6px;
+}
+
+.popup-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .popup-dist {
@@ -922,7 +925,6 @@ body {
   z-index: 1;
 }
 
-/* 2Dレーダー背景 */
 .ar-radar-bg {
   position: absolute;
   top: 0;
@@ -985,7 +987,7 @@ body {
   transition: transform 0.2s ease-out;
 }
 
-/* AR 3D空間浮遊ピン */
+/* 3D空間浮遊ピン */
 .ar-floating-pin {
   position: absolute;
   top: 40%;
@@ -1116,7 +1118,6 @@ body {
   cursor: pointer;
 }
 
-/* 道路沿いターンバイターン指示カード */
 .ar-turn-card {
   margin: 8px 16px 0;
   background: rgba(11, 37, 69, 0.92);
@@ -1162,7 +1163,6 @@ body {
   font-weight: 600;
 }
 
-/* 中央ダイナミック矢印 */
 .ar-center-guide {
   display: flex;
   flex-direction: column;
@@ -1203,7 +1203,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* AR 下部パネル */
 .ar-bottom-panel {
   padding-bottom: calc(var(--sab) + 76px);
   padding-left: 16px;
@@ -1336,7 +1335,7 @@ body {
   min-height: 48px;
 }
 
-/* ================= モーダル & 評価内訳バー ================= */
+/* ================= モーダル & 評価内訳 ================= */
 .modal-overlay {
   position: absolute;
   top: 0;
@@ -1386,8 +1385,19 @@ body {
   padding-right: 32px;
 }
 
+.shelter-pill-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0369A1;
+  background-color: #E0F2FE;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid #BAE6FD;
+}
+
 .detail-header h2 {
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--color-indigo);
   margin-top: 6px;
@@ -1400,7 +1410,6 @@ body {
   font-weight: 600;
 }
 
-/* 評価内訳プログレスバー */
 .score-breakdown-section {
   background-color: #F8FAFC;
   border-radius: var(--radius-md);
@@ -1483,7 +1492,7 @@ body {
 }
 
 .detail-info-table th {
-  width: 25%;
+  width: 28%;
   text-align: left;
   color: var(--color-text-muted);
   padding: 6px 0;
@@ -1584,7 +1593,6 @@ body {
 .report-icon { font-size: 1.8rem; }
 .report-text { font-size: 0.85rem; font-weight: 700; color: var(--color-indigo); }
 
-/* トースト通知 & スピナー */
 .cool-toast {
   position: absolute;
   top: calc(var(--sat) + 55px);
