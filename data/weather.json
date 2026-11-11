@@ -1,0 +1,10 @@
+{
+  "currentTemp": 33,
+  "maxTemp": 36,
+  "humidity": 68,
+  "heatStrokeAlert": "厳重警戒",
+  "wbgt": 31,
+  "message": "無理をせず、喉が渇く前に涼しい場所で休憩を取りましょう。",
+  "locationName": "東京都千代田区周辺",
+  "lastUpdated": "2026-11-11 10:00"
+}
