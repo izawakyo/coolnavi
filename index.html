@@ -8,8 +8,23 @@
   <meta name="theme-color" content="#0096C7">
   <title>CoolNavi - クーリングシェルター指定暑熱避難所ナビ</title>
 
+  <!-- 古いService Worker・古いキャッシュの完全強制破棄 (Safariキャッシュ対策) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) caches.delete(name);
+      });
+    }
+  </script>
+
   <!-- PWA & アイコン -->
-  <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="images/icon.svg">
   <link rel="apple-touch-icon" href="images/icon.svg">
 
@@ -35,14 +50,9 @@
         <span class="tagline">クーリングシェルター案内</span>
       </div>
       <div class="header-right">
-        <!-- オープンデータ連動インジケーター -->
-        <span id="opendata-live-badge" class="opendata-status-pill" title="クーリングシェルターオープンデータ接続">🏛️ シェルター連動</span>
-        <!-- デモ位置スイッチ -->
-        <label class="demo-switch" title="東京駅周辺のテスト位置でシミュレーションします">
-          <input type="checkbox" id="demo-location-toggle">
-          <span class="slider"></span>
-          <span class="switch-label">テスト位置</span>
-        </label>
+        <button id="btn-refresh-location" class="btn-refresh-header" title="現在地を再取得して避難所を更新">
+          🔄 現在地更新
+        </button>
       </div>
     </header>
 
@@ -56,11 +66,11 @@
           <div class="weather-top-row">
             <div class="temp-badge">
               <span class="weather-icon">☀️</span>
-              <span class="current-temp" id="weather-temp">33℃</span>
-              <span class="max-temp" id="weather-max-temp">最高 36℃</span>
+              <span class="current-temp" id="weather-temp">--℃</span>
+              <span class="max-temp" id="weather-max-temp">最高 --℃</span>
             </div>
             <div class="weather-badges-col">
-              <div id="weather-alert-badge" class="weather-alert">⚠️ 熱中症: 厳重警戒</div>
+              <div id="weather-alert-badge" class="weather-alert">⚠️ 熱中症注意</div>
               <span id="weather-source-badge" class="weather-source-pill">気象オープンデータ</span>
             </div>
           </div>
@@ -72,11 +82,10 @@
         <!-- 現在地ステータスバー -->
         <div class="location-status-bar">
           <div id="current-location-status" class="loc-text">
-            📍 現在地から避難施設を検索中...
+            📍 GPSで現在地を取得中...
           </div>
           <div class="loc-actions">
             <button id="btn-fetch-opendata" class="btn-icon-opendata" title="周辺オープンデータを再取得">🏛️ 再検索</button>
-            <button id="btn-refresh-location" class="btn-icon-refresh" title="現在地を再取得">🔄</button>
           </div>
         </div>
 
@@ -91,13 +100,13 @@
         <!-- おすすめのクーリングシェルター (第1位ハイライト) -->
         <div class="section-container">
           <div class="section-title-wrap">
-            <h3 class="section-title">🏛️ 現在地から一番休みやすい避難施設</h3>
+            <h3 class="section-title">🏛️ あなたの現在地から一番近い避難所</h3>
             <span class="section-hint">休みやすさ・設備総合評価</span>
           </div>
           <div id="home-top-place-card" class="top-place-card">
             <div class="loading-spinner-wrap">
               <div class="spinner"></div>
-              <p>近くの避難施設を計算中...</p>
+              <p>あなたの現在地周辺のクーリングシェルターを検索中...</p>
             </div>
           </div>
         </div>
@@ -126,7 +135,7 @@
         <div class="list-header">
           <div class="list-title-area">
             <h2>クーリングシェルターをさがす</h2>
-            <p class="subtext">自治体指定暑熱避難所オープンデータより現在地周辺をご案内</p>
+            <p class="subtext">あなたの現在地周辺の避難施設をご案内</p>
           </div>
           <div class="sort-tabs">
             <button id="sort-recommend-btn" class="sort-tab-btn active">🌟 休みやすさ順</button>
@@ -138,7 +147,7 @@
         <div id="places-list-container" class="places-list">
           <div class="loading-spinner-wrap">
             <div class="spinner"></div>
-            <p>避難施設データを読み込み中...</p>
+            <p>現在地周辺の避難施設を検索中...</p>
           </div>
         </div>
       </section>
@@ -147,14 +156,12 @@
       <section id="tab-view-map" class="tab-view">
         <div id="map-container"></div>
         
-        <!-- 地図フローティング操作ボタン -->
         <div class="map-floating-controls">
           <button id="btn-map-center" class="map-fab" title="現在地に移動">
             📍 現在地
           </button>
         </div>
 
-        <!-- 選択中の施設フロートバナー -->
         <div id="map-bottom-banner" class="map-banner">
           <!-- JSで動的生成 -->
         </div>
@@ -166,7 +173,7 @@
           <!-- カメラ映像 -->
           <video id="ar-video" autoplay playsinline muted></video>
 
-          <!-- 2Dレーダー背景 (カメラ停止時) -->
+          <!-- 2Dレーダー背景 -->
           <div class="ar-radar-bg">
             <div class="radar-circle circle-1"></div>
             <div class="radar-circle circle-2"></div>
@@ -176,7 +183,7 @@
             <div class="radar-self-dot"></div>
           </div>
 
-          <!-- AR空間浮遊ピン (カメラ映像内に浮かび上がるピン) -->
+          <!-- AR空間浮遊ピン -->
           <div id="ar-floating-pin" class="ar-floating-pin">
             <div class="pin-bubble">
               <span class="pin-icon">🏛️</span>
@@ -188,9 +195,8 @@
             <div class="pin-anchor-arrow">▼</div>
           </div>
 
-          <!-- AR HUD (ヘッドアップディスプレイ) -->
+          <!-- AR HUD -->
           <div class="ar-hud">
-            <!-- 上部バー -->
             <div class="ar-top-bar">
               <div class="ar-target-info">
                 <span class="ar-target-label">避難目的地</span>
@@ -202,7 +208,6 @@
               </div>
             </div>
 
-            <!-- 道路沿いターンバイターン指示カード (曲がり角案内) -->
             <div id="ar-turn-card" class="ar-turn-card">
               <div id="ar-turn-icon" class="turn-icon">↱</div>
               <div class="turn-body">
@@ -211,7 +216,6 @@
               </div>
             </div>
 
-            <!-- 中央ダイナミック矢印ガイド -->
             <div class="ar-center-guide">
               <div id="ar-direction-arrow" class="ar-arrow">
                 <svg viewBox="0 0 100 100" class="arrow-svg">
@@ -221,7 +225,6 @@
               <div id="ar-guide-message" class="ar-guide-text">端末を向けてください</div>
             </div>
 
-            <!-- 下部情報パネル -->
             <div class="ar-bottom-panel">
               <div class="ar-stats-row">
                 <div class="ar-stat-col">
@@ -266,15 +269,11 @@
       </button>
     </nav>
 
-    <!-- ================= モーダル群 ================= -->
-
     <!-- 施設詳細モーダル -->
     <div id="modal-place-detail" class="modal-overlay">
       <div class="modal-card">
         <button class="modal-close" aria-label="閉じる">✕</button>
-        <div id="modal-place-detail-body" class="modal-body">
-          <!-- JSで動的生成 -->
-        </div>
+        <div id="modal-place-detail-body" class="modal-body"></div>
       </div>
     </div>
 
@@ -313,7 +312,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
-  <!-- CoolNavi スクリプト群 (依存関係順) -->
+  <!-- CoolNavi スクリプト群 -->
   <script src="js/recommendation.js"></script>
   <script src="js/location.js"></script>
   <script src="js/routing.js"></script>

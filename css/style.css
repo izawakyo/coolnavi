@@ -125,14 +125,22 @@ body {
   gap: 6px;
 }
 
-.opendata-status-pill {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #0369A1;
+.btn-refresh-header {
   background-color: #E0F2FE;
-  padding: 2px 6px;
-  border-radius: var(--radius-full);
   border: 1px solid #BAE6FD;
+  color: #0369A1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-refresh-header:active {
+  background-color: #BAE6FD;
 }
 
 .demo-switch {

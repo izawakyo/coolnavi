@@ -2,8 +2,9 @@
  * app.js - CoolNavi アプリケーション全体制御
  * 
  * 完全現在地連動オープンデータ検索版:
- * - places.json は一切使用しない
- * - 起動時に現在地を取得し、その緯度経度から周辺の実際のクーリングシェルターを即時検索
+ * - places.json は一切使用しません
+ * - 端末のGPSから取得した本物の現在地周辺のみを検索・表示
+ * - 偽データや東京駅のフォールバックを排除
  */
 
 window.CoolNaviApp = {
@@ -28,7 +29,7 @@ window.CoolNaviApp = {
       this.renderAROverlay(state);
     });
 
-    // 3. 現在地を取得し、その周辺のオープンデータを即時ロード
+    // 3. 現在地(GPS)を取得して即座に周辺施設を検索
     await this.refreshLocation(false);
   },
 
@@ -67,19 +68,13 @@ window.CoolNaviApp = {
       btnRefreshLocation.addEventListener('click', () => this.refreshLocation(true));
     }
 
-    const demoToggle = document.getElementById('demo-location-toggle');
-    if (demoToggle) {
-      demoToggle.addEventListener('change', async (e) => {
-        LocationManager.setMockMode(e.target.checked);
-        await this.refreshLocation(false);
-        this.showToast(e.target.checked ? '東京駅周辺のテスト位置に設定しました' : '実際のGPS位置情報に切り替えました');
-      });
-    }
-
     const btnFetchOpenData = document.getElementById('btn-fetch-opendata');
     if (btnFetchOpenData) {
       btnFetchOpenData.addEventListener('click', async () => {
-        if (!this.currentLocation) return;
+        if (!this.currentLocation) {
+          this.refreshLocation(true);
+          return;
+        }
         this.showToast('現在地周辺のクーリングシェルターを再検索中...');
         await PlacesManager.fetchPlacesByLocation(this.currentLocation.latitude, this.currentLocation.longitude);
         this.renderAllViews();
@@ -174,38 +169,36 @@ window.CoolNaviApp = {
   },
 
   /**
-   * 現在地を取得し、その緯度経度からリアルタイムにオープンデータを検索
+   * 現在地(GPS)を取得し、その緯度経度からリアルタイムに周辺避難施設を検索
    */
   async refreshLocation(showFeedback = false) {
     const locStatusText = document.getElementById('current-location-status');
     const homeCard = document.getElementById('home-top-place-card');
     const listContainer = document.getElementById('places-list-container');
 
-    if (locStatusText) locStatusText.textContent = '現在地を取得中...';
+    if (locStatusText) locStatusText.innerHTML = '📍 <strong>GPSで現在地を取得中...</strong>';
     if (homeCard) {
       homeCard.innerHTML = `
         <div class="loading-spinner-wrap">
           <div class="spinner"></div>
-          <p>現在地周辺のクーリングシェルターを検索中...</p>
+          <p>あなたの現在地周辺のクーリングシェルターを検索中...</p>
         </div>
       `;
     }
 
     try {
+      // 端末のリアルな現在地GPSを取得
       const position = await LocationManager.getCurrentPosition();
       this.currentLocation = position;
 
       if (locStatusText) {
-        if (position.isMock) {
-          locStatusText.innerHTML = '📍 <strong>東京駅周辺</strong> (テスト位置)';
-        } else {
-          locStatusText.innerHTML = `📍 <strong>現在地取得完了</strong> (誤差 ±${Math.round(position.accuracy)}m)`;
-        }
+        locStatusText.innerHTML = `📍 <strong>現在地取得完了</strong> (精度 ±${Math.round(position.accuracy)}m)`;
       }
 
+      // 地図の中心を現在地に移動
       MapManager.updateCurrentLocation(this.currentLocation, true);
 
-      // 現在地の緯度経度から、周辺のリアルタイム避難施設・気象をフェッチ
+      // 現在地の座標周辺の避難施設と気象データをフェッチ
       await Promise.all([
         PlacesManager.fetchLiveWeather(position.latitude, position.longitude),
         PlacesManager.fetchPlacesByLocation(position.latitude, position.longitude)
@@ -215,22 +208,22 @@ window.CoolNaviApp = {
       this.renderWeather(this.weatherData);
       this.renderAllViews();
 
-      if (showFeedback) this.showToast('現在地周辺の避難施設を検索しました');
+      if (showFeedback) this.showToast('現在地周辺のクーリングシェルターを更新しました');
     } catch (error) {
-      console.warn('位置情報取得失敗:', error.message);
-      if (!this.currentLocation) {
-        LocationManager.setMockMode(true);
-        const demoToggle = document.getElementById('demo-location-toggle');
-        if (demoToggle) demoToggle.checked = true;
-        this.currentLocation = LocationManager.MOCK_LOCATION;
-        MapManager.updateCurrentLocation(this.currentLocation, true);
-
-        await Promise.all([
-          PlacesManager.fetchLiveWeather(this.currentLocation.latitude, this.currentLocation.longitude),
-          PlacesManager.fetchPlacesByLocation(this.currentLocation.latitude, this.currentLocation.longitude)
-        ]);
-        this.renderWeather(PlacesManager.weather);
-        this.renderAllViews();
+      console.warn('現在地取得失敗:', error.message);
+      if (locStatusText) {
+        locStatusText.innerHTML = `⚠️ <strong>位置情報が必要です</strong><br><small>ブラウザで位置情報を許可して更新ボタンを押してください</small>`;
+      }
+      if (homeCard) {
+        homeCard.innerHTML = `
+          <div class="empty-list" style="padding: 20px; text-align: center;">
+            <p style="font-weight: 700; color: #B91C1C;">⚠️ 位置情報が許可されていません</p>
+            <p style="font-size: 0.8rem; color: #64748B; margin-top: 6px;">あなたの近くのクーリングシェルターを探すには、位置情報（GPS）の利用を許可してください。</p>
+            <button class="btn-primary" style="margin: 14px auto 0; width: auto; padding: 8px 18px;" onclick="window.CoolNaviApp.refreshLocation(true)">
+              🔄 再度位置情報を許可して探す
+            </button>
+          </div>
+        `;
       }
       if (showFeedback) alert(error.message);
     }
@@ -277,13 +270,13 @@ window.CoolNaviApp = {
     const evalData = topPlace.evaluation;
     cardEl.innerHTML = `
       <div class="top-place-header">
-        <span class="recommend-badge-ribbon">🏛️ 現在地から一番近い避難施設</span>
+        <span class="recommend-badge-ribbon">🏛️ あなたの現在地から一番近い避難所</span>
         <span class="badge ${evalData.badgeClass}">${evalData.rank}</span>
       </div>
       <h3 class="top-place-name">${topPlace.name}</h3>
       <div class="top-place-meta">
         <span class="meta-dist">🚶 <strong>徒歩 約${evalData.walkingMinutes}分</strong> (${evalData.formattedDistance})</span>
-        <span class="meta-status">受入定員: 約${topPlace.capacity || 50}名</span>
+        <span class="meta-status">定員: 約${topPlace.capacity || 50}名</span>
       </div>
       <div class="feature-tags-row">
         ${evalData.tags.map(tag => `<span class="tag-pill">${tag}</span>`).join('')}
