@@ -1,7 +1,9 @@
 /**
  * app.js - CoolNavi アプリケーション全体制御
  * 
- * クーリングシェルター（指定暑熱避難施設）オープンデータ案内版
+ * 完全現在地連動オープンデータ検索版:
+ * - places.json は一切使用しない
+ * - 起動時に現在地を取得し、その緯度経度から周辺の実際のクーリングシェルターを即時検索
  */
 
 window.CoolNaviApp = {
@@ -9,28 +11,24 @@ window.CoolNaviApp = {
   currentLocation: null,
   selectedPlace: null,
   currentRoute: null,
-  placesList: [],
   weatherData: null,
   activeFilter: 'recommend',
 
   async init() {
     this.bindEvents();
 
-    // 1. 初期データロード
-    await this.loadInitialData();
-
-    // 2. 地図の初期化
+    // 1. 地図の初期化
     MapManager.initMap('map-container', (place) => {
       this.onPlaceMarkerClicked(place);
     });
 
-    // 3. ARの初期化
+    // 2. ARの初期化
     const arVideo = document.getElementById('ar-video');
     ARManager.init(arVideo, (state) => {
       this.renderAROverlay(state);
     });
 
-    // 4. 初回位置情報取得
+    // 3. 現在地を取得し、その周辺のオープンデータを即時ロード
     await this.refreshLocation(false);
   },
 
@@ -82,10 +80,10 @@ window.CoolNaviApp = {
     if (btnFetchOpenData) {
       btnFetchOpenData.addEventListener('click', async () => {
         if (!this.currentLocation) return;
-        this.showToast('周辺のクーリングシェルターを検索中...');
-        await PlacesManager.fetchLiveOpenDataPlaces(this.currentLocation.latitude, this.currentLocation.longitude);
+        this.showToast('現在地周辺のクーリングシェルターを再検索中...');
+        await PlacesManager.fetchPlacesByLocation(this.currentLocation.latitude, this.currentLocation.longitude);
         this.renderAllViews();
-        this.showToast('最新の避難所データを反映しました！');
+        this.showToast('周辺の避難所を更新しました！');
       });
     }
 
@@ -175,24 +173,23 @@ window.CoolNaviApp = {
     });
   },
 
-  async loadInitialData() {
-    try {
-      const [places, weather] = await Promise.all([
-        PlacesManager.loadPlaces(),
-        PlacesManager.loadWeather()
-      ]);
-      this.placesList = places;
-      this.weatherData = weather;
-      this.renderWeather(weather);
-      this.renderPlacesList();
-    } catch (err) {
-      console.error('初期データロードエラー:', err);
-    }
-  },
-
+  /**
+   * 現在地を取得し、その緯度経度からリアルタイムにオープンデータを検索
+   */
   async refreshLocation(showFeedback = false) {
     const locStatusText = document.getElementById('current-location-status');
+    const homeCard = document.getElementById('home-top-place-card');
+    const listContainer = document.getElementById('places-list-container');
+
     if (locStatusText) locStatusText.textContent = '現在地を取得中...';
+    if (homeCard) {
+      homeCard.innerHTML = `
+        <div class="loading-spinner-wrap">
+          <div class="spinner"></div>
+          <p>現在地周辺のクーリングシェルターを検索中...</p>
+        </div>
+      `;
+    }
 
     try {
       const position = await LocationManager.getCurrentPosition();
@@ -200,16 +197,25 @@ window.CoolNaviApp = {
 
       if (locStatusText) {
         if (position.isMock) {
-          locStatusText.innerHTML = '📍 <strong>東京駅周辺</strong> (デモ位置)';
+          locStatusText.innerHTML = '📍 <strong>東京駅周辺</strong> (テスト位置)';
         } else {
           locStatusText.innerHTML = `📍 <strong>現在地取得完了</strong> (誤差 ±${Math.round(position.accuracy)}m)`;
         }
       }
 
-      MapManager.updateCurrentLocation(this.currentLocation, false);
-      this.fetchOpenDataAsync(position.latitude, position.longitude);
+      MapManager.updateCurrentLocation(this.currentLocation, true);
+
+      // 現在地の緯度経度から、周辺のリアルタイム避難施設・気象をフェッチ
+      await Promise.all([
+        PlacesManager.fetchLiveWeather(position.latitude, position.longitude),
+        PlacesManager.fetchPlacesByLocation(position.latitude, position.longitude)
+      ]);
+
+      this.weatherData = PlacesManager.weather;
+      this.renderWeather(this.weatherData);
       this.renderAllViews();
-      if (showFeedback) this.showToast('現在地と最寄りの避難所を更新しました');
+
+      if (showFeedback) this.showToast('現在地周辺の避難施設を検索しました');
     } catch (error) {
       console.warn('位置情報取得失敗:', error.message);
       if (!this.currentLocation) {
@@ -217,30 +223,16 @@ window.CoolNaviApp = {
         const demoToggle = document.getElementById('demo-location-toggle');
         if (demoToggle) demoToggle.checked = true;
         this.currentLocation = LocationManager.MOCK_LOCATION;
-        MapManager.updateCurrentLocation(this.currentLocation, false);
+        MapManager.updateCurrentLocation(this.currentLocation, true);
+
+        await Promise.all([
+          PlacesManager.fetchLiveWeather(this.currentLocation.latitude, this.currentLocation.longitude),
+          PlacesManager.fetchPlacesByLocation(this.currentLocation.latitude, this.currentLocation.longitude)
+        ]);
+        this.renderWeather(PlacesManager.weather);
         this.renderAllViews();
       }
       if (showFeedback) alert(error.message);
-    }
-  },
-
-  async fetchOpenDataAsync(lat, lon) {
-    try {
-      const liveWeather = await PlacesManager.fetchLiveWeather(lat, lon);
-      this.weatherData = liveWeather;
-      this.renderWeather(liveWeather);
-
-      const updatedPlaces = await PlacesManager.fetchLiveOpenDataPlaces(lat, lon);
-      this.placesList = updatedPlaces;
-      this.renderAllViews();
-
-      const badge = document.getElementById('opendata-live-badge');
-      if (badge && PlacesManager.isLiveOpenDataActive) {
-        badge.classList.add('active');
-        badge.textContent = '🏛️ シェルターオープンデータ連動';
-      }
-    } catch (e) {
-      console.warn('オープンデータ連携エラー:', e);
     }
   },
 
@@ -278,20 +270,20 @@ window.CoolNaviApp = {
     if (!cardEl) return;
 
     if (!topPlace) {
-      cardEl.innerHTML = '<p class="empty-text">クーリングシェルターを検索中...</p>';
+      cardEl.innerHTML = '<p class="empty-text">現在地周辺のクーリングシェルターを検索中...</p>';
       return;
     }
 
     const evalData = topPlace.evaluation;
     cardEl.innerHTML = `
       <div class="top-place-header">
-        <span class="recommend-badge-ribbon">🏛️ 最寄りの指定暑熱避難施設</span>
+        <span class="recommend-badge-ribbon">🏛️ 現在地から一番近い避難施設</span>
         <span class="badge ${evalData.badgeClass}">${evalData.rank}</span>
       </div>
       <h3 class="top-place-name">${topPlace.name}</h3>
       <div class="top-place-meta">
         <span class="meta-dist">🚶 <strong>徒歩 約${evalData.walkingMinutes}分</strong> (${evalData.formattedDistance})</span>
-        <span class="meta-status">定員: 約${topPlace.capacity || 50}名</span>
+        <span class="meta-status">受入定員: 約${topPlace.capacity || 50}名</span>
       </div>
       <div class="feature-tags-row">
         ${evalData.tags.map(tag => `<span class="tag-pill">${tag}</span>`).join('')}
@@ -321,7 +313,7 @@ window.CoolNaviApp = {
     const evaluatedList = PlacesManager.getEvaluatedPlaces(this.currentLocation, this.activeFilter);
 
     if (evaluatedList.length === 0) {
-      listEl.innerHTML = '<div class="empty-list">クーリングシェルターが見つかりませんでした。</div>';
+      listEl.innerHTML = '<div class="empty-list">周辺のクーリングシェルターを検索中...</div>';
       return;
     }
 

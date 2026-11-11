@@ -1,9 +1,8 @@
 /**
  * service-worker.js - CoolNavi オフラインキャッシュ
- * 炎天下で通信が不安定な環境でも、アプリUIとキャッシュ済みデータを即座に表示
  */
 
-const CACHE_NAME = 'coolnavi-v1';
+const CACHE_NAME = 'coolnavi-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -16,7 +15,6 @@ const STATIC_ASSETS = [
   './js/map.js',
   './js/ar.js',
   './js/app.js',
-  './data/places.json',
   './data/weather.json',
   './images/icon.svg'
 ];
@@ -42,7 +40,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // 外部API (OSM, Open-Meteo, OSRM) はネットワークファースト
   if (event.request.url.includes('overpass-api') || 
       event.request.url.includes('open-meteo') || 
       event.request.url.includes('project-osrm') ||
@@ -53,7 +50,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静的アセットはキャッシュファースト
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request).then((networkResponse) => {
@@ -63,7 +59,6 @@ self.addEventListener('fetch', (event) => {
         });
       });
     }).catch(() => {
-      // オフライン時のフォールバック
       if (event.request.destination === 'document') {
         return caches.match('./index.html');
       }
